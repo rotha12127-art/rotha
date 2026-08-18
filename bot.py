@@ -17,6 +17,8 @@ BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 # 2. Group ID របស់អ្នក (សម្រាប់ទទួលបានការជូនដំណឹង)
 ADMIN_GROUP_ID = "-1004401338807"
 
+QR_CODE_FILE = "acleda_qr.png"
+
 # 3. បញ្ជីបទចម្រៀង (DATABASE)
 SONGS_DATABASE = {
     "song_1": {
