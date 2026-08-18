@@ -18,12 +18,12 @@ QR_CODE_FILE = "acleda_qr.png"
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1 (ROTHA Remix)",
-        "price": "1.00 USD",
+        "price": "9.99 USD",
         "file_path": "Project_2.mp3",
     },
     "song_2": {
         "title": "Track 2 (ROTHA Remix)",
-        "price": "2.00 USD",
+        "price": "9.99 USD",
         "file_path": "一剪梅.mp3",
     },
 }
@@ -80,7 +80,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎵 **បទចម្រៀង៖** {song['title']}\n"
         f"💰 **តម្លៃ៖** {song['price']}\n\n"
         f"សូមស្កែន QR Code ខាងលើ"
-        f"បន្ទាប់ពីបង់ប្រាក់រួច **សូមផ្ញើរូបភាពវិក្កយបត្រ** ចូលមកកាន់ Chat នេះ! 📸RkunJren😘"
+        f"បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើរូបភាពវិក្កយបត្រចូលមកកាន់ Chat នេះ! RkunJren😘"
     )
 
     try:
@@ -138,7 +138,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="Markdown"
         )
         await update.message.reply_text(
-            "✅ **សូមរង់ចាំ Admin ពិនិត្យផ្ទៀងផ្ទាត់បន្តិច!😊**\n"
+            "✅សូមរង់ចាំ Admin ពិនិត្យផ្ទៀងផ្ទាត់បន្តិច!😊\n"
             "បទចម្រៀងនឹងផ្ញើជូនអ្នកស្វ័យប្រវត្តិ។ 🙏"
         )
     except Exception as e:
@@ -176,7 +176,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="🎉 **Thanks❤️ ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត!** នេះជា File ចម្រៀងរបស់អ្នក៖",
+            text="Thanks❤️🎉 ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
             parse_mode="Markdown"
         )
 
