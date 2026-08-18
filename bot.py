@@ -11,7 +11,7 @@ from telegram.ext import (
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
 
-BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
+BOT_TOKEN = "8469005375:AAHXmdGpdM0DPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 QR_CODE_FILE = "acleda_qr.png"
 
@@ -19,7 +19,7 @@ SONGS_DATABASE = {
     "song_1": {
         "title": "បទសម្រួល ១ (ROTHA Remix)",
         "price": "1.00 USD",
-        "file_path": "Project_2.mp3",
+        "file_path": "11111.mp3",
     },
     "song_2": {
         "title": "បទសម្រួល ២ (ROTHA Remix)",
@@ -72,7 +72,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
         return
 
-    # ចាំទុកបទចម្រៀងដែល User ជ្រើសរើស
+    # រក្សាទុកបទចម្រៀងដែល User ជ្រើសរើស
     context.user_data["pending_song_id"] = song_id
 
     caption_text = (
@@ -101,16 +101,23 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     user = update.message.from_user
     song_id = context.user_data.get("pending_song_id")
 
-    if not song_id:
-        await update.message.reply_text("❌ សូមជ្រើសរើសបទចម្រៀងជាមុនសិន ដោយចុច /start")
+    if not song_id or song_id not in SONGS_DATABASE:
+        await update.message.reply_text("❌ សូមជ្រើសរើសបទចម្រៀងជាមុនសិន ដោយវាយ /start")
         return
 
     song = SONGS_DATABASE.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
-    # សារជូនដំណឹងទៅ Admin Group ជាមួយប៊ូតុង Confirm
+    # រក្សាទុកទិន្នន័យបណ្តោះអាសន្ន
+    order_key = f"{user.id}_{song_id}"
+    context.bot_data[order_key] = {
+        "user_id": user.id,
+        "song_id": song_id
+    }
+
+    # ប៊ូតុង Confirm ប្រើ callback_data ខ្លីងាយស្រួល
     keyboard = [
-        [InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"approve_{user.id}_{song_id}")]
+        [InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"cfm_{order_key}")]
     ]
 
     admin_caption = (
@@ -123,7 +130,6 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     try:
-        # ផ្ញើរូបភាពវិក្កយបត្រទៅ Admin Group
         await context.bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
             photo=photo_file_id,
@@ -144,10 +150,21 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # ទាញយក User ID និង Song ID ពី callback_data (approve_USERID_SONGID)
-    data_parts = query.data.split("_")
-    client_user_id = int(data_parts[1])
-    song_id = data_parts[2]
+    order_key = query.data.replace("cfm_", "")
+    order_data = context.bot_data.get(order_key)
+
+    if not order_data:
+        # ករណីស្វែងរកក្នុង bot_data មិនឃើញ វានឹងទាញចេញពី order_key ដោយផ្ទាល់
+        try:
+            parts = order_key.split("_")
+            client_user_id = int(parts[0])
+            song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
+        except Exception:
+            await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យ Order នេះទេ!")
+            return
+    else:
+        client_user_id = order_data["user_id"]
+        song_id = order_data["song_id"]
 
     song = SONGS_DATABASE.get(song_id)
 
@@ -197,9 +214,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(show_songs, pattern="^view_songs$"))
     app.add_handler(CallbackQueryHandler(buy_song, pattern="^buy_"))
-    app.add_handler(CallbackQueryHandler(admin_approve, pattern="^approve_"))
+    app.add_handler(CallbackQueryHandler(admin_approve, pattern="^cfm_"))
     
-    # ទទួលរូបភាពវិក្កយបត្រពី Client
     app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
 
     print("Bot is running...")
