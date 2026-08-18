@@ -79,8 +79,8 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💳 **ព័ត៌មានបង់ប្រាក់**\n\n"
         f"🎵 **បទចម្រៀង៖** {song['title']}\n"
         f"💰 **តម្លៃ៖** {song['price']}\n\n"
-        f"សូមស្កែន QR Code ខាងលើ"
         f"បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើរូបភាពវិក្កយបត្រចូលមកកាន់ Chat នេះ! RkunJren😘"
+        f""
     )
 
     try:
