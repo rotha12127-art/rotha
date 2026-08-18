@@ -5,16 +5,15 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
-    MessageHandler,
-    filters,
 )
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
 
-BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
-ADMIN_GROUP_ID = "-1004401338807"
+BOT_TOKEN = "8469005375:AAHXmdGpdM0DPZJYIaIhd4dBq9ZkdUbp-YM"
 
-# ឈ្មោះ File រូបភាព QR Code ដែលបាន Upload ចូល GitHub
+# Group ID របស់អ្នកសម្រាប់ទទួលដំណឹង
+ADMIN_GROUP_ID = "-1004401338807" 
+
 QR_CODE_FILE = "acleda_qr.png" 
 
 SONGS_DATABASE = {
@@ -63,7 +62,6 @@ async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ជំហានទី១៖ ផ្ញើ QR Code សម្រាប់បង់ប្រាក់"""
     query = update.callback_query
     await query.answer()
 
@@ -74,7 +72,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
         return
 
-    # ប៊ូតុងទទួលបានចម្រៀងបន្ទាប់ពីបង់ប្រាក់រួច
     keyboard = [
         [InlineKeyboardButton("✅ ខ្ញុំបានបង់ប្រាក់រួចហើយ (ទាញយកចម្រៀង)", callback_data=f"getsong_{song_id}")]
     ]
@@ -96,7 +93,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
     except FileNotFoundError:
-        # ប្រសិនបើរករូប QR Code មិនឃើញ ឱ្យវាផ្ញើសារអក្សរជំនួស
         await query.message.reply_text(
             f"❌ រកមិនឃើញ File QR Code `{QR_CODE_FILE}` ក្នុង GitHub ទេ!\n\n" + caption_text,
             reply_markup=InlineKeyboardMarkup(keyboard),
@@ -104,21 +100,37 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def send_song_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ជំហានទី២៖ ផ្ញើ File MP3 ចម្រៀងទៅកាន់ Client"""
     query = update.callback_query
     await query.answer()
 
     song_id = query.data.replace("getsong_", "")
     song = SONGS_DATABASE.get(song_id)
+    user = query.from_user  # ព័ត៌មានរបស់ Client ដែលទិញ
 
     if not song:
         await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
         return
 
-    # ផ្ញើសារអរគុណ
+    # 1. ផ្ញើសារជូនដំណឹងទៅ Admin Group 🔔
+    admin_msg = (
+        f"🔔 **មានអតិថិជនបានចុចទិញចម្រៀង!**\n\n"
+        f"👤 **អតិថិជន៖** {user.full_name} (@{user.username if user.username else 'គ្មាន Username'})\n"
+        f"🆔 **User ID:** `{user.id}`\n"
+        f"🎵 **បទចម្រៀង៖** {song['title']}\n"
+        f"💰 **តម្លៃ៖** {song['price']}"
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_GROUP_ID,
+            text=admin_msg,
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logging.error(f"មិនអាចផ្ញើសារទៅ Admin Group បានទេ៖ {e}")
+
+    # 2. ផ្ញើ File MP3 ទៅឱ្យ Client
     await query.message.reply_text("🎉 សូមអរគុណសម្រាប់ការបង់ប្រាក់! នេះជា File ចម្រៀងរបស់អ្នក៖")
 
-    # ផ្ញើ File MP3
     if "file_path" in song:
         try:
             with open(song["file_path"], "rb") as audio_file:
