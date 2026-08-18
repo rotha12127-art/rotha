@@ -24,7 +24,7 @@ SONGS_DATABASE = {
     "song_2": {
         "title": "បទសម្រួល ២ (ROTHA Remix)",
         "price": "2.00 USD",
-        "file_url": "https://example.com/song2.mp3",
+        "file_path": "一剪梅.mp3",
     },
 }
 
