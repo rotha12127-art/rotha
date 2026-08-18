@@ -45,6 +45,11 @@ SONGS_DATABASE = {
         "price": "9.99 USD",
         "file_path": "一剪梅.mp3",
     },
+    "song_3": {
+        "title": "Track 3 (ROTHA Remix)",
+        "price": "9.99 USD",
+        "file_path": "r1.mp3",
+    },
 }
 
 # =========================================================================
