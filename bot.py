@@ -1,4 +1,7 @@
 import logging
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
@@ -8,6 +11,22 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+
+# ==================== Web Server សម្រាប់ Render Health Check ====================
+# ការពារកុំឱ្យ Render ជាប់ Timed Out ឬដួល (Failed)
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running smoothly!")
+
+def run_health_check_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# ដំណើរការ Web Server ក្នុង Thread ដាច់ដោយឡែក
+threading.Thread(target=run_health_check_server, daemon=True).start()
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
 
@@ -80,7 +99,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎵 **បទចម្រៀង៖** {song['title']}\n"
         f"💰 **តម្លៃ៖** {song['price']}\n\n"
         f"បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើរូបភាពវិក្កយបត្រចូលមកកាន់ Chat នេះ! RkunJren😘"
-        f""
     )
 
     try:
@@ -115,7 +133,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         "song_id": song_id
     }
 
-    # ប៊ូតុង Confirm ប្រើ callback_data ខ្លីងាយស្រួល
+    # ប៊ូតុង Confirm ប្រើ callback_data ខ្លី
     keyboard = [
         [InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"cfm_{order_key}")]
     ]
@@ -154,7 +172,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     order_data = context.bot_data.get(order_key)
 
     if not order_data:
-        # ករណីស្វែងរកក្នុង bot_data មិនឃើញ វានឹងទាញចេញពី order_key ដោយផ្ទាល់
         try:
             parts = order_key.split("_")
             client_user_id = int(parts[0])
