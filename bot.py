@@ -9,7 +9,7 @@ from telegram.ext import (
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
 
-BOT_TOKEN = "8469005375:AAHXmdGpdM0DPZJYIaIhd4dBq9ZkdUbp-YM"
+BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 
 # Group ID របស់អ្នកសម្រាប់ទទួលដំណឹង
 ADMIN_GROUP_ID = "-1004401338807" 
