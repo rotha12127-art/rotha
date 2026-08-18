@@ -22,7 +22,7 @@ SONGS_DATABASE = {
     "song_1": {
         "title": "បទចម្រៀងទី ១ (ROTHA Remix)",
         "price": "1.00 USD",
-        "file_url": "https://example.com/song1.mp3",
+        "file_url": "https://drive.google.com/file/d/1XVWOuMI72CkAovFVKkb-cG3SS0c0AQnQ/view?usp=drivesdk/song1.mp3",
     },
     "song_2": {
         "title": "បទចម្រៀងទី ២ (ROTHA Remix)",
