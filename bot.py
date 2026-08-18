@@ -22,7 +22,7 @@ SONGS_DATABASE = {
     "song_1": {
         "title": "បទចម្រៀងទី ១ (ROTHA Remix)",
         "price": "1.00 USD",
-        "file_path": "python bot.pyá_¢á_¼ááá_¹á áá_¹ááá _ áá_¶á áá_»ááááá_¶ [ OFFICIAL AUDIO ].mp3",
+        "file_path": "11111.mp3",
     },
     "song_2": {
         "title": "បទចម្រៀងទី ២ (ROTHA Remix)",
