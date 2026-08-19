@@ -50,7 +50,6 @@ SONGS_DATABASE = {
         "price": "FREE",
         "is_free": False,      # កែប្រែ៖ ដាក់ False ដើម្បីឱ្យរង់ចាំ Admin Confirm សិន
         "file_path": "Project_3.mp3",
-        "qr_code": "acleda_qr.png",
     },
     "song_4": {
         "title": "Track 4",
