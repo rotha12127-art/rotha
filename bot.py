@@ -57,17 +57,7 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("📁 បញ្ជីចម្រៀង", callback_data="view_songs")]
-    ]
-    await update.message.reply_text(
-        " **សូមស្វាគមន៍មកកាន់ ROTHA Remix Store!** 🎧",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
-
-async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
