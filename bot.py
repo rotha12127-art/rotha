@@ -119,19 +119,22 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ------------------ បើជាបទ FREE ដែលដោនឡូតបានភ្លាមៗ (Track 1 & 2) ------------------
     if song.get("is_free"):
-        await query.message.reply_text("🎉 Downloading and sending to you...", parse_mode="Markdown")
+        # រក្សាទុកសារ Downloading... ក្នុង variable
+        loading_msg = await query.message.reply_text("🎉 Downloading and sending to you...", parse_mode="Markdown")
         try:
             if "file_path" in song:
                 with open(song["file_path"], "rb") as audio_file:
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        caption=f" 🎧 **{song['title']}** \n",
+                        caption=f"🎧 **{song['title']}**",
                         parse_mode="Markdown"
                     )
+            # លុបសារ Downloading... ចោលបន្ទាប់ពីផ្ញើ audio រួចរាល់
+            await loading_msg.delete()
         except Exception as e:
             logging.error(f"Error sending free song: {e}")
-            await query.message.reply_text("❌ There was an error sending the song file! Please try again.")
+            await loading_msg.edit_text("❌ There was an error sending the song file! Please try again.")
         return
 
     # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm (Track 3, 4, 5) ------------------
@@ -372,4 +375,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+        
