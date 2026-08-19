@@ -30,41 +30,41 @@ threading.Thread(target=run_health_check_server, daemon=True).start()
 
 BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
-DEFAULT_QR_CODE = "acleda_qr.png"  # QR code ទូទៅ
+DEFAULT_QR_CODE = "acleda_qr.png"
 
-# កែសម្រួលបញ្ជីចម្រៀង៖ បន្ថែម qr_code ផ្ទាល់ខ្លួនសម្រាប់ Track 5
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1",
         "price": "FREE",
-        "is_free": True,
+        "is_free": True,       # ដោនឡូតបានភ្លាមៗ ដោយមិនបាច់ Confirm
         "file_path": "Project_1.mp3",
     },
     "song_2": {
         "title": "Track 2",
         "price": "FREE",
-        "is_free": True,
+        "is_free": True,       # ដោនឡូតបានភ្លាមៗ ដោយមិនបាច់ Confirm
         "file_path": "Project_2.mp3",
     },
     "song_3": {
         "title": "Track 3",
         "price": "FREE",
-        "is_free": True,
+        "is_free": False,      # កែប្រែ៖ ដាក់ False ដើម្បីឱ្យរង់ចាំ Admin Confirm សិន
         "file_path": "Project_3.mp3",
+        "qr_code": "acleda_qr.png",
     },
     "song_4": {
         "title": "Track 4",
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
-        "qr_code": "acleda_qr.png",  # QR Code សម្រាប់ Track 4
+        "qr_code": "acleda_qr.png",
     },
     "song_5": {
         "title": "Track 5",
-        "price": "999.99 USD",        # កែសម្រួលតម្លៃផ្សេង (ឧទាហរណ៍ 15.00 USD)
+        "price": "999.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
-        "qr_code": "track5_qr.png",   # រូបភាព QR Code ផ្សេងសម្រាប់ Track 5
+        "qr_code": "track5_qr.png",
     },
 }
 
@@ -80,7 +80,7 @@ async def post_init(application):
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        if info.get("is_free"):
+        if info.get("price") == "FREE":
             label = f"🎧 {info['title']} - FREE"
         else:
             label = f"🎧 {info['title']}"
@@ -116,7 +116,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Song data not found!")
         return
 
-    # ------------------ បើជាបទ FREE ------------------
+    # ------------------ បើជាបទ FREE ដែលមិនបាច់ Confirm ------------------
     if song.get("is_free"):
         await query.message.reply_text("🎉 Downloading and sending to you...", parse_mode="Markdown")
         try:
@@ -133,18 +133,24 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("❌ There was an error sending the song file! Please try again.")
         return
 
-    # ------------------ បើជាបទត្រូវបង់ប្រាក់ (Paid) ------------------
+    # ------------------ បើជាបទដែលត្រូវទារការ Confirm / បង់ប្រាក់ ------------------
     context.user_data["pending_song_id"] = song_id
-
-    # ជ្រើសរើសរូប QR Code ទៅតាមបទចម្រៀង បើគ្មានទេ ប្រើរូបទូទៅ (DEFAULT_QR_CODE)
     qr_file_to_send = song.get("qr_code", DEFAULT_QR_CODE)
 
-    caption_text = (
-        f"💳 **Payment Information**\n\n"
-        f"🎵 **Song:** {song['title']}\n"
-        f"💰 **Price:** {song['price']}\n\n"
-        f"Once you have paid, please send the receipt image to me 📥"
-    )
+    if song.get("price") == "FREE":
+        caption_text = (
+            f"ℹ️ **Request Information**\n\n"
+            f"🎵 **Song:** {song['title']}\n"
+            f"💰 **Price:** FREE\n\n"
+            f"Please send a message/confirmation receipt to Admin for approval 📥"
+        )
+    else:
+        caption_text = (
+            f"💳 **Payment Information**\n\n"
+            f"🎵 **Song:** {song['title']}\n"
+            f"💰 **Price:** {song['price']}\n\n"
+            f"Once you have paid, please send the receipt image to me 📥"
+        )
 
     try:
         with open(qr_file_to_send, "rb") as qr_img:
@@ -155,7 +161,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except FileNotFoundError:
         await query.message.reply_text(
-            f"❌ QR Code file `{qr_file_to_send}` not found!\n\n" + caption_text,
+            f"❌ File `{qr_file_to_send}` not found!\n\n" + caption_text,
             parse_mode="Markdown"
         )
 
@@ -184,7 +190,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
 
     admin_caption = (
-        f"🔔 **New Payment Received!**\n\n"
+        f"🔔 **New Request Received!**\n\n"
         f"👤 **Customer:** {user.full_name} (@{user.username if user.username else 'No Username'})\n"
         f"🆔 **User ID:** `{user.id}`\n"
         f"🎵 **Song:** {song['title']}\n"
@@ -205,7 +211,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     except Exception as e:
         logging.error(f"Error sending receipt to group: {e}")
-        await update.message.reply_text("❌ There was an error sending the receipt to the Admin!")
+        await update.message.reply_text("❌ There was an error sending the request to the Admin!")
 
 async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -235,7 +241,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="🎉 Payment approved. Here is your song file:",
+            text="🎉 Request approved! Here is your song file:",
             parse_mode="Markdown"
         )
 
@@ -283,7 +289,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text=f"❌ **Sorry!** The payment information or receipt for **{song_title}** is incorrect. Please check and send the image again.",
+            text=f"❌ **Sorry!** Your request for **{song_title}** was rejected. Please contact Admin for more details.",
             parse_mode="Markdown"
         )
 
@@ -313,4 +319,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-            
+        
