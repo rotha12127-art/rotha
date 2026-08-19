@@ -13,7 +13,6 @@ from telegram.ext import (
 )
 
 # ==================== Web Server សម្រាប់ Render Health Check ====================
-# ការពារកុំឱ្យ Render ជាប់ Timed Out ឬដួល (Failed)
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -25,7 +24,6 @@ def run_health_check_server():
     server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
     server.serve_forever()
 
-# ដំណើរការ Web Server ក្នុង Thread ដាច់ដោយឡែក
 threading.Thread(target=run_health_check_server, daemon=True).start()
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
@@ -34,20 +32,24 @@ BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 QR_CODE_FILE = "acleda_qr.png"
 
+# កែប្រែ Database ដោយបន្ថែម "is_free": True សម្រាប់ Track 1
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1 (ROTHA Remix)",
-        "price": "9.99 USD",
+        "price": "FREE 🎁",
+        "is_free": True,
         "file_path": "Project_2.mp3",
     },
     "song_2": {
         "title": "Track 2 (ROTHA Remix)",
         "price": "9.99 USD",
+        "is_free": False,
         "file_path": "一剪梅.mp3",
     },
     "song_3": {
         "title": "Track 3 (ROTHA Remix)",
         "price": "9.99 USD",
+        "is_free": False,
         "file_path": "r1.mp3",
     },
 }
@@ -72,11 +74,10 @@ async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
+        # បង្ហាញពាក្យ FREE ឬ តម្លៃ លើប៊ូតុង
+        label = f"🎁 {info['title']} - {info['price']}" if info.get("is_free") else f"🎧 {info['title']} - {info['price']}"
         keyboard.append([
-            InlineKeyboardButton(
-                f"🎧 {info['title']} - {info['price']}", 
-                callback_data=f"buy_{s_id}"
-            )
+            InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
         ])
 
     await query.message.reply_text(
@@ -85,7 +86,7 @@ async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ជំហានទី១៖ ផ្ញើ QR Code និងប្រាប់ឱ្យផ្ញើរូបវិក្កយបត្រ"""
+    """ពិនិត្យថាប្រសិនបើជាបទ Free គឺផ្ញើចម្រៀងជូនភ្លាមៗ"""
     query = update.callback_query
     await query.answer()
 
@@ -96,7 +97,33 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
         return
 
-    # រក្សាទុកបទចម្រៀងដែល User ជ្រើសរើស
+    # ------------------ បើជាបទ FREE ------------------
+    if song.get("is_free"):
+        await query.message.reply_text("🎉 **បទនេះឥតគិតថ្លៃ!** កំពុងទាញយក និងផ្ញើជូនអ្នក...", parse_mode="Markdown")
+        try:
+            if "file_path" in song:
+                with open(song["file_path"], "rb") as audio_file:
+                    await context.bot.send_audio(
+                        chat_id=query.from_user.id,
+                        audio=audio_file,
+                        title=song["title"],
+                        caption=f"🎁 **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                        parse_mode="Markdown"
+                    )
+            elif "file_url" in song:
+                await context.bot.send_audio(
+                    chat_id=query.from_user.id,
+                    audio=song["file_url"],
+                    title=song["title"],
+                    caption=f"🎁 **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logging.error(f"Error sending free song: {e}")
+            await query.message.reply_text("❌ មានបញ្ហាក្នុងការផ្ញើ File ចម្រៀង! សូមព្យាយាមម្តងទៀត។")
+        return
+
+    # ------------------ បើជាបទត្រូវបង់ប្រាក់ (Paid) ------------------
     context.user_data["pending_song_id"] = song_id
 
     caption_text = (
@@ -120,7 +147,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ជំហានទី២៖ ទទួលរូបថតវិក្កយបត្រពី Client រួចផ្ញើទៅ Admin Group ដើម្បី Confirm"""
+    """ជំហានទី២៖ ទទួលរូបថតវិក្កយបត្រពី Client រួចផ្ញើទៅ Admin Group"""
     user = update.message.from_user
     song_id = context.user_data.get("pending_song_id")
 
@@ -131,14 +158,12 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     song = SONGS_DATABASE.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
-    # រក្សាទុកទិន្នន័យបណ្តោះអាសន្ន
     order_key = f"{user.id}_{song_id}"
     context.bot_data[order_key] = {
         "user_id": user.id,
         "song_id": song_id
     }
 
-    # ប៊ូតុង Confirm ប្រើ callback_data ខ្លី
     keyboard = [
         [InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"cfm_{order_key}")]
     ]
@@ -194,7 +219,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
         return
 
-    # 1. ផ្ញើចម្រៀងទៅឱ្យ Client
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
@@ -220,7 +244,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
 
-        # 2. ប្តូរសារក្នុង Admin Group ថាបាន Confirm រួចហើយ
         await query.edit_message_caption(
             caption=f"{query.message.caption}\n\n✅ **[បាន Confirm និងផ្ញើចម្រៀងរួចរាល់]**",
             parse_mode="Markdown"
