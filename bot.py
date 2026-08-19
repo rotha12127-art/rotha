@@ -260,7 +260,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text=f"❌ **Sorry!** The payment information or receipt for **{song_title}** is incorrect. Please check and send the image again. 🙏",
+            text=f"❌ **Sorry!** The payment information or receipt for **{song_title}** is incorrect. Please check and send the image again.",
             parse_mode="Markdown"
         )
 
