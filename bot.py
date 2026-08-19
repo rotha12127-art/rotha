@@ -89,19 +89,16 @@ async def post_init(application):
 
 # អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង
 async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
-    # ទាញយក user_id ដើម្បីពិនិត្យថា User ធ្លាប់ទិញ/បានបទណាខ្លះ
     if hasattr(message_or_query, 'from_user'):
         user_id = message_or_query.from_user.id
     else:
         user_id = message_or_query.chat.id
 
-    # រក្សាទុកបញ្ជីចម្រៀងដែល user ទទួលបានក្នុង bot_data
     purchased_songs = context.bot_data.get("purchased_songs", {})
     user_purchased = purchased_songs.get(user_id, set())
 
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        # បើ User ធ្លាប់ទទួលបានចម្រៀងនេះហើយ បន្ថែមសញ្ញា ✅
         has_purchased = s_id in user_purchased
         status_icon = "✅ " if has_purchased else ""
 
@@ -163,7 +160,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         caption=f"🎧 **{song['title']}**",
                         parse_mode="Markdown"
                     )
-            # កត់ត្រាថាបានទទួលចម្រៀងរួចរាល់
             mark_song_as_purchased(context, query.from_user.id, song_id)
             await loading_msg.delete()
         except Exception as e:
@@ -182,7 +178,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💰 <b>Price:</b> {song['price']}\n\n"
         )
     else:
-        # ប្រសិនបើជាបទត្រូវបង់ប្រាក់
         if "original_price" in song:
             price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
         else:
@@ -195,30 +190,30 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Once you have paid, please send the receipt image to me 📥"
         )
 
-    # បើមាន QR Code (បទត្រូវបង់លុយ) ទើបផ្ញើរូបភាព បើគ្មានទេផ្ញើតែសារ
+    info_msg = None
     if song.get("qr_code"):
         try:
             with open(song["qr_code"], "rb") as qr_img:
-                await query.message.reply_photo(
+                info_msg = await query.message.reply_photo(
                     photo=qr_img,
                     caption=caption_text,
                     parse_mode="HTML"
                 )
         except FileNotFoundError:
-            await query.message.reply_text(
+            info_msg = await query.message.reply_text(
                 f"❌ QR Code file `{song['qr_code']}` not found!\n\n" + caption_text,
                 parse_mode="HTML"
             )
     else:
-        # ផ្ញើតែសារអត្ថបទសម្រាប់ Track 2 (គ្មាន QR Code)
-        await query.message.reply_text(caption_text, parse_mode="HTML")
+        info_msg = await query.message.reply_text(caption_text, parse_mode="HTML")
 
-        # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ
+        # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ (សម្រាប់បទ Free)
         user = query.from_user
         order_key = f"{user.id}_{song_id}"
         context.bot_data[order_key] = {
             "user_id": user.id,
-            "song_id": song_id
+            "song_id": song_id,
+            "info_msg_id": info_msg.message_id if info_msg else None
         }
 
         keyboard = [
@@ -246,9 +241,14 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"Error sending request to admin group: {e}")
 
+    # រក្សាទុក message_id នៃសារព័ត៌មានដើម្បីលុបនៅពេលក្រោយ
+    if info_msg:
+        context.user_data["info_msg_id"] = info_msg.message_id
+
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     song_id = context.user_data.get("pending_song_id")
+    info_msg_id = context.user_data.get("info_msg_id")
 
     if not song_id or song_id not in SONGS_DATABASE:
         await update.message.reply_text("❌ Please select a song first by typing /start")
@@ -260,7 +260,8 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     order_key = f"{user.id}_{song_id}"
     context.bot_data[order_key] = {
         "user_id": user.id,
-        "song_id": song_id
+        "song_id": song_id,
+        "info_msg_id": info_msg_id
     }
 
     keyboard = [
@@ -306,12 +307,14 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parts = order_key.split("_")
             client_user_id = int(parts[0])
             song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
+            info_msg_id = None
         except Exception:
             await query.message.reply_text("❌ Order data not found!")
             return
     else:
         client_user_id = order_data["user_id"]
         song_id = order_data["song_id"]
+        info_msg_id = order_data.get("info_msg_id")
 
     song = SONGS_DATABASE.get(song_id)
 
@@ -320,6 +323,13 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
+        # លុបសារ Request / Payment Information ក្នុង Chat របស់ User
+        if info_msg_id:
+            try:
+                await context.bot.delete_message(chat_id=client_user_id, message_id=info_msg_id)
+            except Exception as del_err:
+                logging.warning(f"Could not delete info message: {del_err}")
+
         await context.bot.send_message(
             chat_id=client_user_id,
             text="🎉 Request approved! Here is your song file:",
@@ -335,7 +345,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
 
-        # កត់ត្រាថា User បានទទួលចម្រៀងនេះរួចរាល់
         mark_song_as_purchased(context, client_user_id, song_id)
 
         if query.message.photo:
