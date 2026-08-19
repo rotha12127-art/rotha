@@ -104,14 +104,14 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        caption=f" **{song['title']}** \n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                        caption=f" **{song['title']}** \n",
                         parse_mode="Markdown"
                     )
             elif "file_url" in song:
                 await context.bot.send_audio(
                     chat_id=query.from_user.id,
                     audio=song["file_url"],
-                    caption=f" **{song['title']}** \n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                    caption=f" **{song['title']}** \n",
                     parse_mode="Markdown"
                 )
         except Exception as e:
@@ -216,7 +216,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="🎉 ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
+            text="🎉 RkunJren ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
             parse_mode="Markdown"
         )
 
@@ -226,14 +226,14 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_audio(
                     chat_id=client_user_id,
                     audio=audio_file,
-                    caption=f"🎧 **{song['title']}**\n❤️ RkunJren សូមរីករាយក្នុងការស្តាប់!",
+                    caption=f"🎧 **{song['title']}**\n",
                     parse_mode="Markdown"
                 )
         elif "file_url" in song:
             await context.bot.send_audio(
                 chat_id=client_user_id,
                 audio=song["file_url"],
-                caption=f"🎧 **{song['title']}**\n❤️ RkunJren សូមរីករាយក្នុងការស្តាប់!",
+                caption=f"🎧 **{song['title']}**\n",
                 parse_mode="Markdown"
             )
 
