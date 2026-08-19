@@ -260,7 +260,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text=f"❌ **សូមអភ័យទោស!** ព័ត៌មាន ឬរូបភាពវិក្កយបត្របង់ប្រាក់សម្រាប់បទ **{song_title}** មិនត្រឹមត្រូវទេ។ សូមពិនិត្យ និងផ្ញើរូបភាពឡើងវិញ។ 🙏",
+            text=f"❌ សូមអភ័យទោស! ព័ត៌មាន ឬរូបភាពវិក័យប័ត្រមិនត្រឹមត្រូវទេ! សូមពិនិត្យ និងផ្ញើរូបភាពឡើងវិញ។",
             parse_mode="Markdown"
         )
 
