@@ -160,7 +160,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        caption=f"🎧 **{song['title']}**",
+                        caption=f" **{song['title']}**",
                         parse_mode="Markdown"
                     )
             await loading_msg.delete()
