@@ -164,7 +164,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Confirm & Send Song", callback_data=f"cfm_{order_key}"),
+            InlineKeyboardButton("✅ Confirm", callback_data=f"cfm_{order_key}"),
             InlineKeyboardButton("❌ Reject", callback_data=f"rej_{order_key}")
         ]
     ]
@@ -175,7 +175,6 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         f"🆔 **User ID:** `{user.id}`\n"
         f"🎵 **Song:** {song['title']}\n"
         f"💰 **Price:** {song['price']}\n\n"
-        f"👇 Please check the receipt image below and select:"
     )
 
     try:
