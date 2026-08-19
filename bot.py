@@ -57,7 +57,7 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
-# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង (ប្រើឡើងវិញបាន)
+# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀងភ្លាមៗ
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
@@ -69,14 +69,13 @@ async def display_songs(message_or_query):
     text = "សូមជ្រើសរើសបទចម្រៀងដែលអ្នកចង់បាន៖"
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ពិនិត្យមើលថាវាជា callback_query ឬ message
     if hasattr(message_or_query, 'edit_message_text'):
         await message_or_query.edit_message_text(text, reply_markup=reply_markup)
     else:
         await message_or_query.reply_text(text, reply_markup=reply_markup)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ហៅមុខងារ display_songs ភ្លាមៗដោយមិនមានសារស្វាគមន៍
+    # បង្ហាញបញ្ជីចម្រៀងភ្លាមៗដោយមិនមានសារស្វាគមន៍
     await display_songs(update.message)
 
 async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -205,6 +204,10 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     song = SONGS_DATABASE.get(song_id)
 
+    if not song:
+        await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
+        return
+
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
@@ -212,41 +215,65 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        with open(song["file_path"], "rb") as audio_file:
-            await context.bot.send_audio(
-                chat_id=client_user_id,
-                audio=audio_file,
-                caption=f"🎧 **{song['title']}**\n",
-                parse_mode="Markdown"
-            )
+        if "file_path" in song:
+            with open(song["file_path"], "rb") as audio_file:
+                await context.bot.send_audio(
+                    chat_id=client_user_id,
+                    audio=audio_file,
+                    caption=f"🎧 **{song['title']}**\n",
+                    parse_mode="Markdown"
+                )
 
+        # កែប្រែ៖ ដកប៊ូតុងចេញដោយប្រើ reply_markup=None
         await query.edit_message_caption(
             caption=f"{query.message.caption}\n\n✅ **[បាន Confirm និងផ្ញើចម្រៀងរួចរាល់]**",
+            reply_markup=None,
             parse_mode="Markdown"
         )
+
     except Exception as e:
-        logging.error(f"Error sending song: {e}")
+        logging.error(f"Error sending song to client: {e}")
+        await query.message.reply_text(f"❌ មិនអាចផ្ញើចម្រៀងទៅកាន់ Client បានទេ៖ {e}")
 
 async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
+
     order_key = query.data.replace("rej_", "")
     order_data = context.bot_data.get(order_key)
-    
-    client_user_id = order_data["user_id"]
-    song_id = order_data["song_id"]
-    song = SONGS_DATABASE.get(song_id)
 
-    await context.bot.send_message(
-        chat_id=client_user_id,
-        text=f"❌ **សូមអភ័យទោស!** ព័ត៌មាន ឬរូបភាពវិក្កយបត្រសម្រាប់បទ **{song['title']}** មិនត្រឹមត្រូវទេ។",
-        parse_mode="Markdown"
-    )
-    await query.edit_message_caption(
-        caption=f"{query.message.caption}\n\n❌ **[បាន Reject រួចរាល់]**",
-        parse_mode="Markdown"
-    )
+    if not order_data:
+        try:
+            parts = order_key.split("_")
+            client_user_id = int(parts[0])
+            song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
+        except Exception:
+            await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យ Order នេះទេ!")
+            return
+    else:
+        client_user_id = order_data["user_id"]
+        song_id = order_data["song_id"]
+
+    song = SONGS_DATABASE.get(song_id)
+    song_title = song['title'] if song else "បទចម្រៀង"
+
+    try:
+        await context.bot.send_message(
+            chat_id=client_user_id,
+            text=f"❌ **សូមអភ័យទោស!** ព័ត៌មាន ឬរូបភាពវិក្កយបត្របង់ប្រាក់សម្រាប់បទ **{song_title}** មិនត្រឹមត្រូវទេ។ សូមពិនិត្យ និងផ្ញើរូបភាពឡើងវិញ។ 🙏",
+            parse_mode="Markdown"
+        )
+
+        # កែប្រែ៖ ដកប៊ូតុងចេញដោយប្រើ reply_markup=None
+        await query.edit_message_caption(
+            caption=f"{query.message.caption}\n\n❌ **[បាន Reject/បដិសេធ រួចរាល់]**",
+            reply_markup=None,
+            parse_mode="Markdown"
+        )
+
+    except Exception as e:
+        logging.error(f"Error rejecting order: {e}")
+        await query.message.reply_text(f"❌ មិនអាចផ្ញើសារបដិសេធទៅ Client បានទេ៖ {e}")
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
