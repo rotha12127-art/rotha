@@ -31,7 +31,7 @@ threading.Thread(target=run_health_check_server, daemon=True).start()
 BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 
-# បញ្ជីចម្រៀង៖ Track 1-2 (FREE ផ្ញើភ្លាមៗ) | Track 3 (FREE តែត្រូវចាំ Confirm គ្មាន QR) | Track 4-5 (បង់ប្រាក់ មាន QR)
+# បញ្ជីចម្រៀង updated
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1",
@@ -42,28 +42,37 @@ SONGS_DATABASE = {
     "song_2": {
         "title": "Track 2",
         "price": "FREE",
-        "is_free": True,       # ដោនឡូតបានភ្លាមៗ
+        "is_free": False,      # FREE តែត្រូវចាំ Request Confirm ពី Admin (គ្មាន QR)
         "file_path": "5_6307483950365289011.mp3",
     },
     "song_3": {
         "title": "Track 3",
-        "price": "FREE",
-        "is_free": False,      # ត្រូវចាំ Admin Confirm (គ្មាន QR Code)
+        "price": "0.99 USD",
+        "original_price": "9.99 USD",
+        "is_free": False,
         "file_path": "5_6332401890327798194.mp3",
+        "qr_code": "acleda_qr.png",
     },
     "song_4": {
         "title": "Track 4",
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
-        "qr_code": "acleda_qr.png",   # មាន QR Code
+        "qr_code": "acleda_qr.png",
     },
     "song_5": {
         "title": "Track 5",
         "price": "19.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
-        "qr_code": "track5_qr.png",  # QR Code ផ្សេងសម្រាប់ Track 5
+        "qr_code": "track5_qr.png",
+    },
+    "song_6": {
+        "title": "Track 6",
+        "price": "29.99 USD",
+        "is_free": False,
+        "file_path": "track6.mp3",
+        "qr_code": "acleda_qr.png",
     },
 }
 
@@ -83,8 +92,10 @@ async def display_songs(message_or_query):
     for s_id, info in SONGS_DATABASE.items():
         if info.get("price") == "FREE":
             label = f"🎧 {info['title']} - FREE"
+        elif "original_price" in info:
+            label = f"🎧 {info['title']} - {info['price']} (Discount from {info['original_price']})"
         else:
-            label = f"🎧 {info['title']}"
+            label = f"🎧 {info['title']} - {info['price']}"
             
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
@@ -117,9 +128,8 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Song data not found!")
         return
 
-    # ------------------ បើជាបទ FREE ដែលដោនឡូតបានភ្លាមៗ (Track 1 & 2) ------------------
+    # ------------------ បើជាបទ FREE ដែលដោនឡូតបានភ្លាមៗ (Track 1) ------------------
     if song.get("is_free"):
-        # រក្សាទុកសារ Downloading... ក្នុង variable
         loading_msg = await query.message.reply_text("🎉 Downloading and sending to you...", parse_mode="Markdown")
         try:
             if "file_path" in song:
@@ -130,28 +140,32 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         caption=f"🎧 **{song['title']}**",
                         parse_mode="Markdown"
                     )
-            # លុបសារ Downloading... ចោលបន្ទាប់ពីផ្ញើ audio រួចរាល់
             await loading_msg.delete()
         except Exception as e:
             logging.error(f"Error sending free song: {e}")
             await loading_msg.edit_text("❌ There was an error sending the song file! Please try again.")
         return
 
-    # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm (Track 3, 4, 5) ------------------
+    # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm ------------------
     context.user_data["pending_song_id"] = song_id
 
-    # ប្រសិនបើជាបទ FREE (Track 3)
+    # ប្រសិនបើជាបទ FREE (Track 2) - ដាក់បង្ហាញ Title និង Price ឡើងវិញ
     if song.get("price") == "FREE":
         caption_text = (
             f"ℹ️ **Request Information**\n\n"
-            f"💰 **Price:** FREE\n\n"
+            f"🎵 **Song:** {song['title']}\n"
+            f"💰 **Price:** {song['price']}\n\n"
         )
     else:
-        # ប្រសិនបើជាបទត្រូវបង់ប្រាក់ (Track 4 & 5)
+        # ប្រសិនបើជាបទត្រូវបង់ប្រាក់
+        price_text = song['price']
+        if "original_price" in song:
+            price_text = f"~{song['original_price']}~ **{song['price']}** 🔥 *(Discounted)*"
+
         caption_text = (
             f"💳 **Payment Information**\n\n"
             f"🎵 **Song:** {song['title']}\n"
-            f"💰 **Price:** {song['price']}\n\n"
+            f"💰 **Price:** {price_text}\n\n"
             f"Once you have paid, please send the receipt image to me 📥"
         )
 
@@ -170,10 +184,10 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
     else:
-        # ផ្ញើតែសារអត្ថបទសម្រាប់ Track 3 (គ្មាន QR Code)
+        # ផ្ញើតែសារអត្ថបទសម្រាប់ Track 2 (គ្មាន QR Code)
         await query.message.reply_text(caption_text, parse_mode="Markdown")
 
-        # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ (ដោយសារមិនបាច់ចាំផ្ញើរូប Receipt)
+        # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ
         user = query.from_user
         order_key = f"{user.id}_{song_id}"
         context.bot_data[order_key] = {
@@ -375,4 +389,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+            
