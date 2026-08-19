@@ -48,6 +48,7 @@ SONGS_DATABASE = {
     "song_3": {
         "title": "Track 3",
         "price": "0.99 USD",
+        "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶", # ប្រើ Unicode Strikethrough សម្រាប់បង្ហាញលើ Button
         "original_price": "9.99 USD",
         "is_free": False,
         "file_path": "5_6332401890327798194.mp3",
@@ -92,8 +93,9 @@ async def display_songs(message_or_query):
     for s_id, info in SONGS_DATABASE.items():
         if info.get("price") == "FREE":
             label = f"🎧 {info['title']} - FREE"
-        elif "original_price" in info:
-            label = f"🎧 {info['title']} - {info['price']} (Discount from {info['original_price']})"
+        elif "strike_price" in info:
+            # បង្ហាញលេខវាសពីលើ + តម្លៃថ្មី (គ្មានពាក្យ Discount)
+            label = f"🎧 {info['title']} - {info['strike_price']}  {info['price']}"
         else:
             label = f"🎧 {info['title']} - {info['price']}"
             
@@ -149,7 +151,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm ------------------
     context.user_data["pending_song_id"] = song_id
 
-    # ប្រសិនបើជាបទ FREE (Track 2) - ដាក់បង្ហាញ Title និង Price ឡើងវិញ
+    # ប្រសិនបើជាបទ FREE (Track 2)
     if song.get("price") == "FREE":
         caption_text = (
             f"ℹ️ **Request Information**\n\n"
@@ -160,7 +162,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ប្រសិនបើជាបទត្រូវបង់ប្រាក់
         price_text = song['price']
         if "original_price" in song:
-            price_text = f"~{song['original_price']}~ **{song['price']}** 🔥 *(Discounted)*"
+            price_text = f"~{song['original_price']}~ **{song['price']}**"
 
         caption_text = (
             f"💳 **Payment Information**\n\n"
@@ -309,7 +311,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
 
-        # ធ្វើបច្ចុប្បន្នភាពសាររបស់ Admin
         if query.message.photo:
             await query.edit_message_caption(
                 caption=f"{query.message.caption}\n\n✅ **[Confirmed and song sent]**",
@@ -389,4 +390,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-            
+    
