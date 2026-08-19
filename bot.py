@@ -32,21 +32,34 @@ BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 QR_CODE_FILE = "acleda_qr.png"
 
+# កែសម្រួលបញ្ជីចម្រៀង៖ Track 1-3 ឥតគិតថ្លៃ (FREE) និង Track 4-5 លក់ (Paid)
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1",
         "price": "FREE",
         "is_free": True,
-        "file_path": "Project_2.mp3",
+        "file_path": "Project_1.mp3",
     },
     "song_2": {
         "title": "Track 2",
+        "price": "FREE",
+        "is_free": True,
+        "file_path": "Project_2.mp3",
+    },
+    "song_3": {
+        "title": "Track 3",
+        "price": "FREE",
+        "is_free": True,
+        "file_path": "Project_3.mp3",
+    },
+    "song_4": {
+        "title": "Track 4",
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
     },
-    "song_3": {
-        "title": "Track 3",
+    "song_5": {
+        "title": "Track 5",
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
@@ -63,7 +76,7 @@ async def post_init(application):
         BotCommand("start", "Start the bot")
     ])
 
-# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀងភ្លាមៗ
+# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
@@ -86,7 +99,6 @@ async def display_songs(message_or_query):
         await message_or_query.reply_text(text, reply_markup=reply_markup)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # បង្ហាញបញ្ជីចម្រៀងភ្លាមៗ
     await display_songs(update.message)
 
 async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -114,7 +126,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        caption=f" **{song['title']}** \n",
+                        caption=f" 🎧 **{song['title']}** \n",
                         parse_mode="Markdown"
                     )
         except Exception as e:
@@ -234,7 +246,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
 
-        # កែប្រែ៖ ដកប៊ូតុងចេញដោយប្រើ reply_markup=None
         await query.edit_message_caption(
             caption=f"{query.message.caption}\n\n✅ **[Confirmed and song sent]**",
             reply_markup=None,
@@ -274,7 +285,6 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        # កែប្រែ៖ ដកប៊ូតុងចេញដោយប្រើ reply_markup=None
         await query.edit_message_caption(
             caption=f"{query.message.caption}\n\n❌ **[Rejected]**",
             reply_markup=None,
@@ -286,7 +296,6 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"❌ Cannot send rejection message to client: {e}")
 
 def main():
-    # បន្ថែម post_init ដើម្បីកំណត់ Menu Button
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
