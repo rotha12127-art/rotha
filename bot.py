@@ -343,7 +343,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="🎉 Request approved! Here is your song file:",
+            text="🎉 RkunJren Request approved! Here is your song file:",
             parse_mode="Markdown"
         )
 
@@ -352,7 +352,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_audio(
                     chat_id=client_user_id,
                     audio=audio_file,
-                    caption=f"🎧 **{song['title']}**\n",
+                    caption=f" **{song['title']}**\n",
                     parse_mode="Markdown"
                 )
 
