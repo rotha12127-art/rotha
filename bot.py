@@ -143,8 +143,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ℹ️ **Request Information**\n\n"
             f"🎵 **Song:** {song['title']}\n"
             f"💰 **Price:** FREE\n\n"
-            f"សូមរង់ចាំបន្តិច... ខ្ញុំបានផ្ញើសំណើរបស់អ្នកទៅកាន់ Admin ហើយ។\n"
-            f"Admin នឹងពិនិត្យនិងផ្ញើជូនអ្នកឆាប់ៗនេះ! 🙏"
+            f"សូមរង់ចាំបន្តិច...\n"
         )
     else:
         # ប្រសិនបើជាបទត្រូវបង់ប្រាក់ (Track 4 & 5)
