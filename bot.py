@@ -61,7 +61,12 @@ logging.basicConfig(level=logging.INFO)
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        label = f" {info['title']} - {info['price']}" if info.get("is_free") else f"🎧 {info['title']} - {info['price']}"
+        # កែសម្រួល៖ បង្ហាញ - FREE សម្រាប់បទឥតគិតថ្លៃ តែលុបតម្លៃចេញសម្រាប់បទដែលត្រូវបង់ប្រាក់
+        if info.get("is_free"):
+            label = f" {info['title']} - FREE"
+        else:
+            label = f"🎧 {info['title']}"
+            
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
         ])
@@ -153,7 +158,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Confirm & Send Song", callback_data=f"cfm_{order_key}"),
+            InlineKeyboardButton("✅ Confirm", callback_data=f"cfm_{order_key}"),
             InlineKeyboardButton("❌ Reject", callback_data=f"rej_{order_key}")
         ]
     ]
@@ -291,4 +296,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-            
+    
