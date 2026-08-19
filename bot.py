@@ -114,11 +114,11 @@ async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
         if info.get("price") == "FREE":
-            label = f" {info['title']} - FREE"
+            label = f"🎧 {info['title']} - FREE"
         elif "strike_price" in info:
-            label = f" {info['title']} - {info['strike_price']}  {info['price']}"
+            label = f"🎧 {info['title']} - {info['strike_price']}  {info['price']}"
         else:
-            label = f" {info['title']} - {info['price']}"
+            label = f"🎧 {info['title']} - {info['price']}"
             
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
@@ -160,7 +160,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        caption=f" **{song['title']}**",
+                        caption=f"🎧 **{song['title']}**",
                         parse_mode="Markdown"
                     )
             await loading_msg.delete()
@@ -265,7 +265,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         "user_id": user.id,
         "song_id": song_id,
         "info_msg_id": info_msg_id,
-        "wait_msg_id": wait_msg.message_id  # <--- រក្សាទុក Message ID
+        "wait_msg_id": wait_msg.message_id
     }
 
     keyboard = [
@@ -339,18 +339,20 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as del_err:
                 logging.warning(f"Could not delete wait message: {del_err}")
 
-        await context.bot.send_message(
-            chat_id=client_user_id,
-            text="🎉 RkunJren Request approved! Here is your song file:",
-            parse_mode="Markdown"
-        )
+        # ផ្ញើសារ Request approved សម្រាប់តែ song_3 ដល់ song_6 ប៉ុណ្ណោះ (song_2 មិនផ្ញើទេ)
+        if song_id != "song_2":
+            await context.bot.send_message(
+                chat_id=client_user_id,
+                text="🎉 Request approved! Here is your song file:",
+                parse_mode="Markdown"
+            )
 
         if "file_path" in song:
             with open(song["file_path"], "rb") as audio_file:
                 await context.bot.send_audio(
                     chat_id=client_user_id,
                     audio=audio_file,
-                    caption=f" **{song['title']}**\n",
+                    caption=f"🎧 **{song['title']}**\n",
                     parse_mode="Markdown"
                 )
 
@@ -442,3 +444,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
