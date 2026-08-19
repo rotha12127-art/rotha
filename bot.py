@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
 from telegram.ext import (
     Application,
@@ -16,8 +18,13 @@ from telegram.ext import (
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-Type", "text/html")
         self.end_headers()
         self.wfile.write(b"Bot is running smoothly!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
 
 def run_health_check_server():
     port = int(os.environ.get("PORT", 8080))
@@ -25,6 +32,25 @@ def run_health_check_server():
     server.serve_forever()
 
 threading.Thread(target=run_health_check_server, daemon=True).start()
+
+# ==================== Self-Ping Task (ការពារ Render Sleep) ====================
+async def self_ping():
+    # URL របស់ Render App របស់អ្នក
+    url = "https://rotha.onrender.com"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    
+    # រង់ចាំ ១០ វិនាទីឱ្យ Web Server ឆេះស្រួលបួល
+    await asyncio.sleep(10)
+    
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                response = await client.get(url, headers=headers, timeout=15)
+                logging.info(f"Self-ping status code: {response.status_code}")
+            except Exception as e:
+                logging.error(f"Self-ping failed: {e}")
+            # Ping ខ្លួនឯងរៀងរាល់ ៥ នាទី (300 វិនាទី)
+            await asyncio.sleep(300)
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
 
@@ -81,11 +107,13 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
-# អនុគមន៍សម្រាប់កំណត់ Menu Button ពេលចាប់ផ្ដើម Bot
+# អនុគមន៍សម្រាប់កំណត់ Menu Button និងចាប់ផ្តើម Self-Ping
 async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
+    # ចាប់ផ្តើមរត់ Self-ping ជាមួយ Asyncio Background Task
+    asyncio.create_task(self_ping())
 
 # អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង (ដកសញ្ញា ✅ ចេញ)
 async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
@@ -404,4 +432,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+        
