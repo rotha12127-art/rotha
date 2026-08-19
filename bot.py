@@ -2,7 +2,7 @@ import logging
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -57,13 +57,19 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
+# អនុគមន៍សម្រាប់កំណត់ Menu Button ពេលចាប់ផ្ដើម Bot
+async def post_init(application):
+    await application.bot.set_my_commands([
+        BotCommand("start", "Start the bot")
+    ])
+
 # អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀងភ្លាមៗ
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        # កែសម្រួល៖ បង្ហាញ - FREE សម្រាប់បទឥតគិតថ្លៃ តែលុបតម្លៃចេញសម្រាប់បទដែលត្រូវបង់ប្រាក់
+        # បង្ហាញ - FREE សម្រាប់បទឥតគិតថ្លៃ
         if info.get("is_free"):
-            label = f" {info['title']} - FREE"
+            label = f"🎧 {info['title']} - FREE"
         else:
             label = f"🎧 {info['title']}"
             
@@ -80,7 +86,7 @@ async def display_songs(message_or_query):
         await message_or_query.reply_text(text, reply_markup=reply_markup)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # បង្ហាញបញ្ជីចម្រៀងភ្លាមៗដោយមិនមានសារស្វាគមន៍
+    # បង្ហាញបញ្ជីចម្រៀងភ្លាមៗ
     await display_songs(update.message)
 
 async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -158,7 +164,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Confirm", callback_data=f"cfm_{order_key}"),
+            InlineKeyboardButton("✅ Confirm & Send Song", callback_data=f"cfm_{order_key}"),
             InlineKeyboardButton("❌ Reject", callback_data=f"rej_{order_key}")
         ]
     ]
@@ -281,7 +287,8 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"❌ Cannot send rejection message to client: {e}")
 
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    # បន្ថែម post_init ដើម្បីកំណត់ Menu Button
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(show_songs, pattern="^view_songs$"))
