@@ -88,15 +88,29 @@ async def post_init(application):
     ])
 
 # អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង
-async def display_songs(message_or_query):
+async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
+    # ទាញយក user_id ដើម្បីពិនិត្យថា User ធ្លាប់ទិញ/បានបទណាខ្លះ
+    if hasattr(message_or_query, 'from_user'):
+        user_id = message_or_query.from_user.id
+    else:
+        user_id = message_or_query.chat.id
+
+    # រក្សាទុកបញ្ជីចម្រៀងដែល user ទទួលបានក្នុង bot_data
+    purchased_songs = context.bot_data.get("purchased_songs", {})
+    user_purchased = purchased_songs.get(user_id, set())
+
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
+        # បើ User ធ្លាប់ទទួលបានចម្រៀងនេះហើយ បន្ថែមសញ្ញា ✅
+        has_purchased = s_id in user_purchased
+        status_icon = "✅ " if has_purchased else ""
+
         if info.get("price") == "FREE":
-            label = f"🎧 {info['title']} - FREE"
+            label = f"{status_icon}🎧 {info['title']} - FREE"
         elif "strike_price" in info:
-            label = f"🎧 {info['title']} - {info['strike_price']}  {info['price']}"
+            label = f"{status_icon}🎧 {info['title']} - {info['strike_price']}  {info['price']}"
         else:
-            label = f"🎧 {info['title']} - {info['price']}"
+            label = f"{status_icon}🎧 {info['title']} - {info['price']}"
             
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
@@ -110,13 +124,21 @@ async def display_songs(message_or_query):
     else:
         await message_or_query.reply_text(text, reply_markup=reply_markup)
 
+# អនុគមន៍សម្រាប់ Mark ថា user បានទទួលចម្រៀងរួចរាល់
+def mark_song_as_purchased(context: ContextTypes.DEFAULT_TYPE, user_id: int, song_id: str):
+    if "purchased_songs" not in context.bot_data:
+        context.bot_data["purchased_songs"] = {}
+    if user_id not in context.bot_data["purchased_songs"]:
+        context.bot_data["purchased_songs"][user_id] = set()
+    context.bot_data["purchased_songs"][user_id].add(song_id)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await display_songs(update.message)
+    await display_songs(update.message, context)
 
 async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await display_songs(query)
+    await display_songs(query, context)
 
 async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -141,6 +163,8 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         caption=f"🎧 **{song['title']}**",
                         parse_mode="Markdown"
                     )
+            # កត់ត្រាថាបានទទួលចម្រៀងរួចរាល់
+            mark_song_as_purchased(context, query.from_user.id, song_id)
             await loading_msg.delete()
         except Exception as e:
             logging.error(f"Error sending free song: {e}")
@@ -160,7 +184,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         # ប្រសិនបើជាបទត្រូវបង់ប្រាក់
         if "original_price" in song:
-            # ប្រើ HTML tag <s> សម្រាប់ធ្វើ Strikethrough លើ Caption
             price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
         else:
             price_text = f"<b>{song['price']}</b>"
@@ -179,7 +202,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.message.reply_photo(
                     photo=qr_img,
                     caption=caption_text,
-                    parse_mode="HTML"  # ប្តូរមកប្រើ HTML ជំនួស Markdown
+                    parse_mode="HTML"
                 )
         except FileNotFoundError:
             await query.message.reply_text(
@@ -312,6 +335,9 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
 
+        # កត់ត្រាថា User បានទទួលចម្រៀងនេះរួចរាល់
+        mark_song_as_purchased(context, client_user_id, song_id)
+
         if query.message.photo:
             await query.edit_message_caption(
                 caption=f"{query.message.caption}\n\n✅ <b>[Confirmed and song sent]</b>",
@@ -391,4 +417,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-            
+        
