@@ -35,11 +35,9 @@ threading.Thread(target=run_health_check_server, daemon=True).start()
 
 # ==================== Self-Ping Task (ការពារ Render Sleep) ====================
 async def self_ping():
-    # URL របស់ Render App របស់អ្នក
     url = "https://rotha.onrender.com"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
-    # រង់ចាំ ១០ វិនាទីឱ្យ Web Server ឆេះស្រួលបួល
     await asyncio.sleep(10)
     
     async with httpx.AsyncClient() as client:
@@ -49,7 +47,6 @@ async def self_ping():
                 logging.info(f"Self-ping status code: {response.status_code}")
             except Exception as e:
                 logging.error(f"Self-ping failed: {e}")
-            # Ping ខ្លួនឯងរៀងរាល់ ៥ នាទី (300 វិនាទី)
             await asyncio.sleep(300)
 
 # ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
@@ -107,15 +104,12 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
-# អនុគមន៍សម្រាប់កំណត់ Menu Button និងចាប់ផ្តើម Self-Ping
 async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
-    # ចាប់ផ្តើមរត់ Self-ping ជាមួយ Asyncio Background Task
     asyncio.create_task(self_ping())
 
-# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង (ដកសញ្ញា ✅ ចេញ)
 async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
@@ -178,7 +172,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm ------------------
     context.user_data["pending_song_id"] = song_id
 
-    # ប្រសិនបើជាបទ FREE (Track 2)
     if song.get("price") == "FREE":
         caption_text = (
             f"ℹ️ <b>Request Information</b>\n\n"
@@ -215,7 +208,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         info_msg = await query.message.reply_text(caption_text, parse_mode="HTML")
 
-        # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ (សម្រាប់បទ Free)
         user = query.from_user
         order_key = f"{user.id}_{song_id}"
         context.bot_data[order_key] = {
@@ -249,7 +241,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"Error sending request to admin group: {e}")
 
-    # រក្សាទុក message_id នៃសារព័ត៌មានដើម្បីលុបនៅពេលក្រោយ
     if info_msg:
         context.user_data["info_msg_id"] = info_msg.message_id
 
@@ -265,11 +256,18 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     song = SONGS_DATABASE.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
+    # ផ្ញើសាររង់ចាំ ហើយរក្សាទុក wait_msg_id ដើម្បីលុបពេល Admin Approve
+    wait_msg = await update.message.reply_text(
+        "✅ Please wait for the Admin to verify!\n"
+        "The song will be sent to you automatically. 🙏"
+    )
+
     order_key = f"{user.id}_{song_id}"
     context.bot_data[order_key] = {
         "user_id": user.id,
         "song_id": song_id,
-        "info_msg_id": info_msg_id
+        "info_msg_id": info_msg_id,
+        "wait_msg_id": wait_msg.message_id  # <--- រក្សាទុក Message ID
     }
 
     keyboard = [
@@ -295,10 +293,6 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
-        await update.message.reply_text(
-            "✅ Please wait for the Admin to verify!\n"
-            "The song will be sent to you automatically. 🙏"
-        )
     except Exception as e:
         logging.error(f"Error sending receipt to group: {e}")
         await update.message.reply_text("❌ There was an error sending the receipt to the Admin!")
@@ -316,6 +310,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             client_user_id = int(parts[0])
             song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
             info_msg_id = None
+            wait_msg_id = None
         except Exception:
             await query.message.reply_text("❌ Order data not found!")
             return
@@ -323,6 +318,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         client_user_id = order_data["user_id"]
         song_id = order_data["song_id"]
         info_msg_id = order_data.get("info_msg_id")
+        wait_msg_id = order_data.get("wait_msg_id")
 
     song = SONGS_DATABASE.get(song_id)
 
@@ -331,12 +327,19 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # លុបសារ Request / Payment Information ក្នុង Chat របស់ User
+        # លុបសារ Payment / Request Information
         if info_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=info_msg_id)
             except Exception as del_err:
                 logging.warning(f"Could not delete info message: {del_err}")
+
+        # លុបសារ "Please wait for the Admin to verify!"
+        if wait_msg_id:
+            try:
+                await context.bot.delete_message(chat_id=client_user_id, message_id=wait_msg_id)
+            except Exception as del_err:
+                logging.warning(f"Could not delete wait message: {del_err}")
 
         await context.bot.send_message(
             chat_id=client_user_id,
@@ -382,17 +385,26 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parts = order_key.split("_")
             client_user_id = int(parts[0])
             song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
+            wait_msg_id = None
         except Exception:
             await query.message.reply_text("❌ Order data not found!")
             return
     else:
         client_user_id = order_data["user_id"]
         song_id = order_data["song_id"]
+        wait_msg_id = order_data.get("wait_msg_id")
 
     song = SONGS_DATABASE.get(song_id)
     song_title = song['title'] if song else "Song"
 
     try:
+        # លុបសារ "Please wait for the Admin to verify!" ប្រសិនបើ Reject
+        if wait_msg_id:
+            try:
+                await context.bot.delete_message(chat_id=client_user_id, message_id=wait_msg_id)
+            except Exception as del_err:
+                logging.warning(f"Could not delete wait message on reject: {del_err}")
+
         await context.bot.send_message(
             chat_id=client_user_id,
             text=f"❌ **Sorry!** Your request for **{song_title}** was rejected. Please contact Admin for more details.",
