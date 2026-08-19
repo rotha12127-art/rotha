@@ -59,7 +59,7 @@ logging.basicConfig(level=logging.INFO)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("📁 មើលបញ្ជីចម្រៀង", callback_data="view_songs")]
+        [InlineKeyboardButton("📁 បញ្ជីចម្រៀង", callback_data="view_songs")]
     ]
     await update.message.reply_text(
         " **សូមស្វាគមន៍មកកាន់ ROTHA Remix Store!** 🎧",
@@ -96,7 +96,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ------------------ បើជាបទ FREE ------------------
     if song.get("is_free"):
-        await query.message.reply_text("🎉 **បទនេះឥតគិតថ្លៃ!** កំពុងទាញយក និងផ្ញើជូនអ្នក...", parse_mode="Markdown")
+        await query.message.reply_text("🎉 កំពុងទាញយក និងផ្ញើជូនអ្នក...", parse_mode="Markdown")
         try:
             if "file_path" in song:
                 with open(song["file_path"], "rb") as audio_file:
@@ -104,14 +104,14 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        caption=f" **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                        caption=f" **{song['title']}** \n❤️ សូមរីករាយក្នុងការស្តាប់!",
                         parse_mode="Markdown"
                     )
             elif "file_url" in song:
                 await context.bot.send_audio(
                     chat_id=query.from_user.id,
                     audio=song["file_url"],
-                    caption=f" **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                    caption=f" **{song['title']}** \n❤️ សូមរីករាយក្នុងការស្តាប់!",
                     parse_mode="Markdown"
                 )
         except Exception as e:
@@ -126,7 +126,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💳 **ព័ត៌មានបង់ប្រាក់**\n\n"
         f"🎵 **បទចម្រៀង៖** {song['title']}\n"
         f"💰 **តម្លៃ៖** {song['price']}\n\n"
-        f"បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើរូបភាពវិក្កយបត្រចូលមកកាន់ Chat នេះ!📌"
+        f"ពេលដែលអ្នកបានបង់ប្រាក់រួចរាល់ សូមផ្ញើរូបភាពវិក្ក័យបត្រចូលមកកាន់ខ្ញុំ 📥"
     )
 
     try:
@@ -181,7 +181,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="Markdown"
         )
         await update.message.reply_text(
-            "✅សូមរង់ចាំ Admin ពិនិត្យផ្ទៀងផ្ទាត់បន្តិច!😊\n"
+            "✅សូមរង់ចាំ Admin ពិនិត្យផ្ទៀងផ្ទាត់បន្តិច!\n"
             "បទចម្រៀងនឹងផ្ញើជូនអ្នកស្វ័យប្រវត្តិ។ 🙏"
         )
     except Exception as e:
@@ -216,7 +216,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
+            text="🎉 ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
             parse_mode="Markdown"
         )
 
