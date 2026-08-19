@@ -48,7 +48,7 @@ SONGS_DATABASE = {
     "song_3": {
         "title": "Track 3",
         "price": "0.99 USD",
-        "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶", # ប្រើ Unicode Strikethrough សម្រាប់បង្ហាញលើ Button
+        "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶", # សម្រាប់បង្ហាញលើ Inline Button
         "original_price": "9.99 USD",
         "is_free": False,
         "file_path": "5_6332401890327798194.mp3",
@@ -94,7 +94,6 @@ async def display_songs(message_or_query):
         if info.get("price") == "FREE":
             label = f"🎧 {info['title']} - FREE"
         elif "strike_price" in info:
-            # បង្ហាញលេខវាសពីលើ + តម្លៃថ្មី (គ្មានពាក្យ Discount)
             label = f"🎧 {info['title']} - {info['strike_price']}  {info['price']}"
         else:
             label = f"🎧 {info['title']} - {info['price']}"
@@ -154,20 +153,22 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ប្រសិនបើជាបទ FREE (Track 2)
     if song.get("price") == "FREE":
         caption_text = (
-            f"ℹ️ **Request Information**\n\n"
-            f"🎵 **Song:** {song['title']}\n"
-            f"💰 **Price:** {song['price']}\n\n"
+            f"ℹ️ <b>Request Information</b>\n\n"
+            f"🎵 <b>Song:</b> {song['title']}\n"
+            f"💰 <b>Price:</b> {song['price']}\n\n"
         )
     else:
         # ប្រសិនបើជាបទត្រូវបង់ប្រាក់
-        price_text = song['price']
         if "original_price" in song:
-            price_text = f"~{song['original_price']}~ **{song['price']}**"
+            # ប្រើ HTML tag <s> សម្រាប់ធ្វើ Strikethrough លើ Caption
+            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
+        else:
+            price_text = f"<b>{song['price']}</b>"
 
         caption_text = (
-            f"💳 **Payment Information**\n\n"
-            f"🎵 **Song:** {song['title']}\n"
-            f"💰 **Price:** {price_text}\n\n"
+            f"💳 <b>Payment Information</b>\n\n"
+            f"🎵 <b>Song:</b> {song['title']}\n"
+            f"💰 <b>Price:</b> {price_text}\n\n"
             f"Once you have paid, please send the receipt image to me 📥"
         )
 
@@ -178,16 +179,16 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.message.reply_photo(
                     photo=qr_img,
                     caption=caption_text,
-                    parse_mode="Markdown"
+                    parse_mode="HTML"  # ប្តូរមកប្រើ HTML ជំនួស Markdown
                 )
         except FileNotFoundError:
             await query.message.reply_text(
                 f"❌ QR Code file `{song['qr_code']}` not found!\n\n" + caption_text,
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
     else:
         # ផ្ញើតែសារអត្ថបទសម្រាប់ Track 2 (គ្មាន QR Code)
-        await query.message.reply_text(caption_text, parse_mode="Markdown")
+        await query.message.reply_text(caption_text, parse_mode="HTML")
 
         # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ
         user = query.from_user
@@ -205,11 +206,11 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         admin_caption = (
-            f"🔔 **New Free Request Received!**\n\n"
-            f"👤 **Customer:** {user.full_name} (@{user.username if user.username else 'No Username'})\n"
-            f"🆔 **User ID:** `{user.id}`\n"
-            f"🎵 **Song:** {song['title']}\n"
-            f"💰 **Price:** {song['price']}\n\n"
+            f"🔔 <b>New Free Request Received!</b>\n\n"
+            f"👤 <b>Customer:</b> {user.full_name} (@{user.username if user.username else 'No Username'})\n"
+            f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+            f"🎵 <b>Song:</b> {song['title']}\n"
+            f"💰 <b>Price:</b> {song['price']}\n\n"
         )
 
         try:
@@ -217,7 +218,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=ADMIN_GROUP_ID,
                 text=admin_caption,
                 reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception as e:
             logging.error(f"Error sending request to admin group: {e}")
@@ -247,11 +248,11 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
 
     admin_caption = (
-        f"🔔 **New Payment Received!**\n\n"
-        f"👤 **Customer:** {user.full_name} (@{user.username if user.username else 'No Username'})\n"
-        f"🆔 **User ID:** `{user.id}`\n"
-        f"🎵 **Song:** {song['title']}\n"
-        f"💰 **Price:** {song['price']}\n\n"
+        f"🔔 <b>New Payment Received!</b>\n\n"
+        f"👤 <b>Customer:</b> {user.full_name} (@{user.username if user.username else 'No Username'})\n"
+        f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+        f"🎵 <b>Song:</b> {song['title']}\n"
+        f"💰 <b>Price:</b> {song['price']}\n\n"
     )
 
     try:
@@ -260,7 +261,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
             photo=photo_file_id,
             caption=admin_caption,
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         await update.message.reply_text(
             "✅ Please wait for the Admin to verify!\n"
@@ -313,15 +314,15 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if query.message.photo:
             await query.edit_message_caption(
-                caption=f"{query.message.caption}\n\n✅ **[Confirmed and song sent]**",
+                caption=f"{query.message.caption}\n\n✅ <b>[Confirmed and song sent]</b>",
                 reply_markup=None,
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         else:
             await query.edit_message_text(
-                text=f"{query.message.text}\n\n✅ **[Confirmed and song sent]**",
+                text=f"{query.message.text}\n\n✅ <b>[Confirmed and song sent]</b>",
                 reply_markup=None,
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
 
     except Exception as e:
@@ -359,15 +360,15 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if query.message.photo:
             await query.edit_message_caption(
-                caption=f"{query.message.caption}\n\n❌ **[Rejected]**",
+                caption=f"{query.message.caption}\n\n❌ <b>[Rejected]</b>",
                 reply_markup=None,
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         else:
             await query.edit_message_text(
-                text=f"{query.message.text}\n\n❌ **[Rejected]**",
+                text=f"{query.message.text}\n\n❌ <b>[Rejected]</b>",
                 reply_markup=None,
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
 
     except Exception as e:
@@ -390,4 +391,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+            
