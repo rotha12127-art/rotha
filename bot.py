@@ -175,8 +175,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if song.get("price") == "FREE":
         caption_text = (
             f"ℹ️ <b>Request Information</b>\n\n"
-            f"🎵 <b>Song:</b> {song['title']}\n"
-            f"💰 <b>Price:</b> {song['price']}\n\n"
         )
     else:
         if "original_price" in song:
