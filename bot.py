@@ -32,22 +32,21 @@ BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 QR_CODE_FILE = "acleda_qr.png"
 
-# កែប្រែ Database ដោយបន្ថែម "is_free": True សម្រាប់ Track 1
 SONGS_DATABASE = {
     "song_1": {
-        "title": "Track 1 (ROTHA Remix)",
-        "price": "FREE 🎁",
+        "title": "Track 1",
+        "price": "FREE",
         "is_free": True,
         "file_path": "Project_2.mp3",
     },
     "song_2": {
-        "title": "Track 2 (ROTHA Remix)",
+        "title": "Track 2",
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
     },
     "song_3": {
-        "title": "Track 3 (ROTHA Remix)",
+        "title": "Track 3",
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
@@ -60,10 +59,10 @@ logging.basicConfig(level=logging.INFO)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("🎵 មើលបញ្ជីចម្រៀង", callback_data="view_songs")]
+        [InlineKeyboardButton("📁 មើលបញ្ជីចម្រៀង", callback_data="view_songs")]
     ]
     await update.message.reply_text(
-        "🎧 **សូមស្វាគមន៍មកកាន់ ROTHA Remix Store!** 🎧",
+        " **សូមស្វាគមន៍មកកាន់ ROTHA Remix Store!** 🎧",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -74,8 +73,7 @@ async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        # បង្ហាញពាក្យ FREE ឬ តម្លៃ លើប៊ូតុង
-        label = f"🎁 {info['title']} - {info['price']}" if info.get("is_free") else f"🎧 {info['title']} - {info['price']}"
+        label = f" {info['title']} - {info['price']}" if info.get("is_free") else f"🎧 {info['title']} - {info['price']}"
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
         ])
@@ -86,7 +84,6 @@ async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ពិនិត្យថាប្រសិនបើជាបទ Free គឺផ្ញើចម្រៀងជូនភ្លាមៗ"""
     query = update.callback_query
     await query.answer()
 
@@ -103,19 +100,18 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             if "file_path" in song:
                 with open(song["file_path"], "rb") as audio_file:
+                    # លុប title=song["title"] ចេញ ដើម្បីរក្សា Title ដើមរបស់ File
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
-                        title=song["title"],
-                        caption=f"🎁 **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                        caption=f" **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
                         parse_mode="Markdown"
                     )
             elif "file_url" in song:
                 await context.bot.send_audio(
                     chat_id=query.from_user.id,
                     audio=song["file_url"],
-                    title=song["title"],
-                    caption=f"🎁 **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                    caption=f" **{song['title']}** (Free Download)\n❤️ សូមរីករាយក្នុងការស្តាប់!",
                     parse_mode="Markdown"
                 )
         except Exception as e:
@@ -130,7 +126,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💳 **ព័ត៌មានបង់ប្រាក់**\n\n"
         f"🎵 **បទចម្រៀង៖** {song['title']}\n"
         f"💰 **តម្លៃ៖** {song['price']}\n\n"
-        f"បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើរូបភាពវិក្កយបត្រចូលមកកាន់ Chat នេះ! RkunJren😘"
+        f"បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើរូបភាពវិក្កយបត្រចូលមកកាន់ Chat នេះ!📌"
     )
 
     try:
@@ -147,7 +143,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ជំហានទី២៖ ទទួលរូបថតវិក្កយបត្រពី Client រួចផ្ញើទៅ Admin Group"""
     user = update.message.from_user
     song_id = context.user_data.get("pending_song_id")
 
@@ -194,7 +189,6 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("❌ មានបញ្ហាក្នុងការផ្ញើវិក្កយបត្រទៅកាន់ Admin!")
 
 async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ជំហានទី៣៖ ពេល Admin ចុច Confirm វានឹងផ្ញើចម្រៀងទៅកាន់ Client"""
     query = update.callback_query
     await query.answer()
 
@@ -222,25 +216,24 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="Thanks❤️🎉 ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
+            text="ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
             parse_mode="Markdown"
         )
 
         if "file_path" in song:
             with open(song["file_path"], "rb") as audio_file:
+                # លុប title=song["title"] ចេញ ដើម្បីរក្សា Title ដើមរបស់ File
                 await context.bot.send_audio(
                     chat_id=client_user_id,
                     audio=audio_file,
-                    title=song["title"],
-                    caption=f"🎧 **{song['title']}**\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                    caption=f"🎧 **{song['title']}**\n❤️ RkunJren សូមរីករាយក្នុងការស្តាប់!",
                     parse_mode="Markdown"
                 )
         elif "file_url" in song:
             await context.bot.send_audio(
                 chat_id=client_user_id,
                 audio=song["file_url"],
-                title=song["title"],
-                caption=f"🎧 **{song['title']}**\n❤️ សូមរីករាយក្នុងការស្តាប់!",
+                caption=f"🎧 **{song['title']}**\n❤️ RkunJren សូមរីករាយក្នុងការស្តាប់!",
                 parse_mode="Markdown"
             )
 
@@ -268,3 +261,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
