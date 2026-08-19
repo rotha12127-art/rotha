@@ -30,9 +30,9 @@ threading.Thread(target=run_health_check_server, daemon=True).start()
 
 BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
-QR_CODE_FILE = "acleda_qr.png"
+DEFAULT_QR_CODE = "acleda_qr.png"  # QR code ទូទៅ
 
-# កែសម្រួលបញ្ជីចម្រៀង៖ Track 1-3 ឥតគិតថ្លៃ (FREE) និង Track 4-5 លក់ (Paid)
+# កែសម្រួលបញ្ជីចម្រៀង៖ បន្ថែម qr_code ផ្ទាល់ខ្លួនសម្រាប់ Track 5
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1",
@@ -57,12 +57,14 @@ SONGS_DATABASE = {
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
+        "qr_code": "acleda_qr.png",  # QR Code សម្រាប់ Track 4
     },
     "song_5": {
         "title": "Track 5",
-        "price": "9.99 USD",
+        "price": "999.99 USD",        # កែសម្រួលតម្លៃផ្សេង (ឧទាហរណ៍ 15.00 USD)
         "is_free": False,
         "file_path": "r1.mp3",
+        "qr_code": "track5_qr.png",   # រូបភាព QR Code ផ្សេងសម្រាប់ Track 5
     },
 }
 
@@ -70,17 +72,14 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
-# អនុគមន៍សម្រាប់កំណត់ Menu Button ពេលចាប់ផ្ដើម Bot
 async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
 
-# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        # បង្ហាញ - FREE សម្រាប់បទឥតគិតថ្លៃ
         if info.get("is_free"):
             label = f"🎧 {info['title']} - FREE"
         else:
@@ -137,6 +136,9 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ------------------ បើជាបទត្រូវបង់ប្រាក់ (Paid) ------------------
     context.user_data["pending_song_id"] = song_id
 
+    # ជ្រើសរើសរូប QR Code ទៅតាមបទចម្រៀង បើគ្មានទេ ប្រើរូបទូទៅ (DEFAULT_QR_CODE)
+    qr_file_to_send = song.get("qr_code", DEFAULT_QR_CODE)
+
     caption_text = (
         f"💳 **Payment Information**\n\n"
         f"🎵 **Song:** {song['title']}\n"
@@ -145,7 +147,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        with open(QR_CODE_FILE, "rb") as qr_img:
+        with open(qr_file_to_send, "rb") as qr_img:
             await query.message.reply_photo(
                 photo=qr_img,
                 caption=caption_text,
@@ -153,7 +155,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except FileNotFoundError:
         await query.message.reply_text(
-            f"❌ QR Code file `{QR_CODE_FILE}` not found!\n\n" + caption_text,
+            f"❌ QR Code file `{qr_file_to_send}` not found!\n\n" + caption_text,
             parse_mode="Markdown"
         )
 
@@ -233,7 +235,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="🎉 RkunJren Payment approved. Here is your song file:",
+            text="🎉 Payment approved. Here is your song file:",
             parse_mode="Markdown"
         )
 
@@ -311,4 +313,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+            
