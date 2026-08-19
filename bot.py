@@ -66,7 +66,7 @@ async def display_songs(message_or_query):
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
         ])
     
-    text = "សូមជ្រើសរើសបទចម្រៀងដែលអ្នកចង់បាន៖"
+    text = "Please select the song you want:"
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if hasattr(message_or_query, 'edit_message_text'):
@@ -91,12 +91,12 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     song = SONGS_DATABASE.get(song_id)
 
     if not song:
-        await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
+        await query.message.reply_text("❌ Song data not found!")
         return
 
     # ------------------ បើជាបទ FREE ------------------
     if song.get("is_free"):
-        await query.message.reply_text("🎉 កំពុងទាញយក និងផ្ញើជូនអ្នក...", parse_mode="Markdown")
+        await query.message.reply_text("🎉 Downloading and sending to you...", parse_mode="Markdown")
         try:
             if "file_path" in song:
                 with open(song["file_path"], "rb") as audio_file:
@@ -108,17 +108,17 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
         except Exception as e:
             logging.error(f"Error sending free song: {e}")
-            await query.message.reply_text("❌ មានបញ្ហាក្នុងការផ្ញើ File ចម្រៀង! សូមព្យាយាមម្តងទៀត។")
+            await query.message.reply_text("❌ There was an error sending the song file! Please try again.")
         return
 
     # ------------------ បើជាបទត្រូវបង់ប្រាក់ (Paid) ------------------
     context.user_data["pending_song_id"] = song_id
 
     caption_text = (
-        f"💳 **ព័ត៌មានបង់ប្រាក់**\n\n"
-        f"🎵 **បទចម្រៀង៖** {song['title']}\n"
-        f"💰 **តម្លៃ៖** {song['price']}\n\n"
-        f"ពេលដែលអ្នកបានបង់ប្រាក់រួចរាល់ សូមផ្ញើរូបភាពវិក្ក័យបត្រចូលមកកាន់ខ្ញុំ 📥"
+        f"💳 **Payment Information**\n\n"
+        f"🎵 **Song:** {song['title']}\n"
+        f"💰 **Price:** {song['price']}\n\n"
+        f"Once you have paid, please send the receipt image to me 📥"
     )
 
     try:
@@ -130,7 +130,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     except FileNotFoundError:
         await query.message.reply_text(
-            f"❌ រកមិនឃើញ File QR Code `{QR_CODE_FILE}` ក្នុង GitHub ទេ!\n\n" + caption_text,
+            f"❌ QR Code file `{QR_CODE_FILE}` not found!\n\n" + caption_text,
             parse_mode="Markdown"
         )
 
@@ -139,7 +139,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     song_id = context.user_data.get("pending_song_id")
 
     if not song_id or song_id not in SONGS_DATABASE:
-        await update.message.reply_text("❌ សូមជ្រើសរើសបទចម្រៀងជាមុនសិន ដោយវាយ /start")
+        await update.message.reply_text("❌ Please select a song first by typing /start")
         return
 
     song = SONGS_DATABASE.get(song_id)
@@ -153,18 +153,18 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"cfm_{order_key}"),
-            InlineKeyboardButton("❌ Reject (បដិសេធ)", callback_data=f"rej_{order_key}")
+            InlineKeyboardButton("✅ Confirm & Send Song", callback_data=f"cfm_{order_key}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"rej_{order_key}")
         ]
     ]
 
     admin_caption = (
-        f"🔔 **មានការបង់ប្រាក់ថ្មី!**\n\n"
-        f"👤 **អតិថិជន៖** {user.full_name} (@{user.username if user.username else 'គ្មាន Username'})\n"
+        f"🔔 **New Payment Received!**\n\n"
+        f"👤 **Customer:** {user.full_name} (@{user.username if user.username else 'No Username'})\n"
         f"🆔 **User ID:** `{user.id}`\n"
-        f"🎵 **បទចម្រៀង៖** {song['title']}\n"
-        f"💰 **តម្លៃ៖** {song['price']}\n\n"
-        f"👇 សូមពិនិត្យរូបភាពវិក្កយបត្រ ខាងក្រោម រួចជ្រើសរើស៖"
+        f"🎵 **Song:** {song['title']}\n"
+        f"💰 **Price:** {song['price']}\n\n"
+        f"👇 Please check the receipt image below and select:"
     )
 
     try:
@@ -176,12 +176,12 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="Markdown"
         )
         await update.message.reply_text(
-            "✅សូមរង់ចាំ Admin ពិនិត្យផ្ទៀងផ្ទាត់បន្តិច!\n"
-            "បទចម្រៀងនឹងផ្ញើជូនអ្នកស្វ័យប្រវត្តិ។ 🙏"
+            "✅ Please wait for the Admin to verify!\n"
+            "The song will be sent to you automatically. 🙏"
         )
     except Exception as e:
         logging.error(f"Error sending receipt to group: {e}")
-        await update.message.reply_text("❌ មានបញ្ហាក្នុងការផ្ញើវិក្កយបត្រទៅកាន់ Admin!")
+        await update.message.reply_text("❌ There was an error sending the receipt to the Admin!")
 
 async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -196,7 +196,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             client_user_id = int(parts[0])
             song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
         except Exception:
-            await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យ Order នេះទេ!")
+            await query.message.reply_text("❌ Order data not found!")
             return
     else:
         client_user_id = order_data["user_id"]
@@ -205,13 +205,13 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     song = SONGS_DATABASE.get(song_id)
 
     if not song:
-        await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
+        await query.message.reply_text("❌ Song data not found!")
         return
 
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text="🎉 RkunJren ការបង់ប្រាក់ត្រូវបានអនុញ្ញាត នេះជា File ចម្រៀងរបស់អ្នក៖",
+            text="🎉 Payment approved. Here is your song file:",
             parse_mode="Markdown"
         )
 
@@ -226,14 +226,14 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # កែប្រែ៖ ដកប៊ូតុងចេញដោយប្រើ reply_markup=None
         await query.edit_message_caption(
-            caption=f"{query.message.caption}\n\n✅ **[បាន Confirm និងផ្ញើចម្រៀងរួចរាល់]**",
+            caption=f"{query.message.caption}\n\n✅ **[Confirmed and song sent]**",
             reply_markup=None,
             parse_mode="Markdown"
         )
 
     except Exception as e:
         logging.error(f"Error sending song to client: {e}")
-        await query.message.reply_text(f"❌ មិនអាចផ្ញើចម្រៀងទៅកាន់ Client បានទេ៖ {e}")
+        await query.message.reply_text(f"❌ Cannot send song to client: {e}")
 
 async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -248,32 +248,32 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
             client_user_id = int(parts[0])
             song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
         except Exception:
-            await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យ Order នេះទេ!")
+            await query.message.reply_text("❌ Order data not found!")
             return
     else:
         client_user_id = order_data["user_id"]
         song_id = order_data["song_id"]
 
     song = SONGS_DATABASE.get(song_id)
-    song_title = song['title'] if song else "បទចម្រៀង"
+    song_title = song['title'] if song else "Song"
 
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
-            text=f"❌ សូមអភ័យទោស! ព័ត៌មាន ឬរូបភាពវិក័យប័ត្រមិនត្រឹមត្រូវទេ! សូមពិនិត្យ និងផ្ញើរូបភាពឡើងវិញ។",
+            text=f"❌ **Sorry!** The payment information or receipt for **{song_title}** is incorrect. Please check and send the image again. 🙏",
             parse_mode="Markdown"
         )
 
         # កែប្រែ៖ ដកប៊ូតុងចេញដោយប្រើ reply_markup=None
         await query.edit_message_caption(
-            caption=f"{query.message.caption}\n\n❌ **[បាន Reject/បដិសេធ រួចរាល់]**",
+            caption=f"{query.message.caption}\n\n❌ **[Rejected]**",
             reply_markup=None,
             parse_mode="Markdown"
         )
 
     except Exception as e:
         logging.error(f"Error rejecting order: {e}")
-        await query.message.reply_text(f"❌ មិនអាចផ្ញើសារបដិសេធទៅ Client បានទេ៖ {e}")
+        await query.message.reply_text(f"❌ Cannot send rejection message to client: {e}")
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -291,4 +291,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+            
