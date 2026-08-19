@@ -57,21 +57,32 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
-    async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
+# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង (ប្រើឡើងវិញបាន)
+async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
         label = f" {info['title']} - {info['price']}" if info.get("is_free") else f"🎧 {info['title']} - {info['price']}"
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
         ])
+    
+    text = "សូមជ្រើសរើសបទចម្រៀងដែលអ្នកចង់បាន៖"
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.message.reply_text(
-        "សូមជ្រើសរើសបទចម្រៀងដែលអ្នកចង់បាន៖",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # ពិនិត្យមើលថាវាជា callback_query ឬ message
+    if hasattr(message_or_query, 'edit_message_text'):
+        await message_or_query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        await message_or_query.reply_text(text, reply_markup=reply_markup)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ហៅមុខងារ display_songs ភ្លាមៗដោយមិនមានសារស្វាគមន៍
+    await display_songs(update.message)
+
+async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await display_songs(query)
 
 async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -90,20 +101,12 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             if "file_path" in song:
                 with open(song["file_path"], "rb") as audio_file:
-                    # លុប title=song["title"] ចេញ ដើម្បីរក្សា Title ដើមរបស់ File
                     await context.bot.send_audio(
                         chat_id=query.from_user.id,
                         audio=audio_file,
                         caption=f" **{song['title']}** \n",
                         parse_mode="Markdown"
                     )
-            elif "file_url" in song:
-                await context.bot.send_audio(
-                    chat_id=query.from_user.id,
-                    audio=song["file_url"],
-                    caption=f" **{song['title']}** \n",
-                    parse_mode="Markdown"
-                )
         except Exception as e:
             logging.error(f"Error sending free song: {e}")
             await query.message.reply_text("❌ មានបញ្ហាក្នុងការផ្ញើ File ចម្រៀង! សូមព្យាយាមម្តងទៀត។")
@@ -150,7 +153,10 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     }
 
     keyboard = [
-        [InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"cfm_{order_key}")]
+        [
+            InlineKeyboardButton("✅ Confirm & ផ្ញើចម្រៀង", callback_data=f"cfm_{order_key}"),
+            InlineKeyboardButton("❌ Reject (បដិសេធ)", callback_data=f"rej_{order_key}")
+        ]
     ]
 
     admin_caption = (
@@ -159,7 +165,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         f"🆔 **User ID:** `{user.id}`\n"
         f"🎵 **បទចម្រៀង៖** {song['title']}\n"
         f"💰 **តម្លៃ៖** {song['price']}\n\n"
-        f"👇 សូមពិនិត្យរូបភាពវិក្កយបត្រ ខាងក្រោម រួចចុច Confirm៖"
+        f"👇 សូមពិនិត្យរូបភាពវិក្កយបត្រ ខាងក្រោម រួចជ្រើសរើស៖"
     )
 
     try:
@@ -199,10 +205,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     song = SONGS_DATABASE.get(song_id)
 
-    if not song:
-        await query.message.reply_text("❌ រកមិនឃើញទិន្នន័យបទចម្រៀងនេះទេ!")
-        return
-
     try:
         await context.bot.send_message(
             chat_id=client_user_id,
@@ -210,19 +212,10 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        if "file_path" in song:
-            with open(song["file_path"], "rb") as audio_file:
-                # លុប title=song["title"] ចេញ ដើម្បីរក្សា Title ដើមរបស់ File
-                await context.bot.send_audio(
-                    chat_id=client_user_id,
-                    audio=audio_file,
-                    caption=f"🎧 **{song['title']}**\n",
-                    parse_mode="Markdown"
-                )
-        elif "file_url" in song:
+        with open(song["file_path"], "rb") as audio_file:
             await context.bot.send_audio(
                 chat_id=client_user_id,
-                audio=song["file_url"],
+                audio=audio_file,
                 caption=f"🎧 **{song['title']}**\n",
                 parse_mode="Markdown"
             )
@@ -231,10 +224,29 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=f"{query.message.caption}\n\n✅ **[បាន Confirm និងផ្ញើចម្រៀងរួចរាល់]**",
             parse_mode="Markdown"
         )
-
     except Exception as e:
-        logging.error(f"Error sending song to client: {e}")
-        await query.message.reply_text(f"❌ មិនអាចផ្ញើចម្រៀងទៅកាន់ Client បានទេ៖ {e}")
+        logging.error(f"Error sending song: {e}")
+
+async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    order_key = query.data.replace("rej_", "")
+    order_data = context.bot_data.get(order_key)
+    
+    client_user_id = order_data["user_id"]
+    song_id = order_data["song_id"]
+    song = SONGS_DATABASE.get(song_id)
+
+    await context.bot.send_message(
+        chat_id=client_user_id,
+        text=f"❌ **សូមអភ័យទោស!** ព័ត៌មាន ឬរូបភាពវិក្កយបត្រសម្រាប់បទ **{song['title']}** មិនត្រឹមត្រូវទេ។",
+        parse_mode="Markdown"
+    )
+    await query.edit_message_caption(
+        caption=f"{query.message.caption}\n\n❌ **[បាន Reject រួចរាល់]**",
+        parse_mode="Markdown"
+    )
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -243,6 +255,7 @@ def main():
     app.add_handler(CallbackQueryHandler(show_songs, pattern="^view_songs$"))
     app.add_handler(CallbackQueryHandler(buy_song, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(admin_approve, pattern="^cfm_"))
+    app.add_handler(CallbackQueryHandler(admin_reject, pattern="^rej_"))
     
     app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
 
