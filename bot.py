@@ -30,25 +30,25 @@ threading.Thread(target=run_health_check_server, daemon=True).start()
 
 BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
-DEFAULT_QR_CODE = "acleda_qr.png"
 
+# បញ្ជីចម្រៀង៖ Track 1-2 (FREE ផ្ញើភ្លាមៗ) | Track 3 (FREE តែត្រូវចាំ Confirm គ្មាន QR) | Track 4-5 (បង់ប្រាក់ មាន QR)
 SONGS_DATABASE = {
     "song_1": {
         "title": "Track 1",
         "price": "FREE",
-        "is_free": True,       # ដោនឡូតបានភ្លាមៗ ដោយមិនបាច់ Confirm
+        "is_free": True,       # ដោនឡូតបានភ្លាមៗ
         "file_path": "Project_1.mp3",
     },
     "song_2": {
         "title": "Track 2",
         "price": "FREE",
-        "is_free": True,       # ដោនឡូតបានភ្លាមៗ ដោយមិនបាច់ Confirm
+        "is_free": True,       # ដោនឡូតបានភ្លាមៗ
         "file_path": "Project_2.mp3",
     },
     "song_3": {
         "title": "Track 3",
         "price": "FREE",
-        "is_free": False,      # កែប្រែ៖ ដាក់ False ដើម្បីឱ្យរង់ចាំ Admin Confirm សិន
+        "is_free": False,      # ត្រូវចាំ Admin Confirm (គ្មាន QR Code)
         "file_path": "Project_3.mp3",
     },
     "song_4": {
@@ -56,14 +56,14 @@ SONGS_DATABASE = {
         "price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
-        "qr_code": "acleda_qr.png",
+        "qr_code": "acleda_qr.png",   # មាន QR Code
     },
     "song_5": {
         "title": "Track 5",
         "price": "999.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
-        "qr_code": "track5_qr.png",
+        "qr_code": "track5_qr.png",  # QR Code ផ្សេងសម្រាប់ Track 5
     },
 }
 
@@ -71,11 +71,13 @@ SONGS_DATABASE = {
 
 logging.basicConfig(level=logging.INFO)
 
+# អនុគមន៍សម្រាប់កំណត់ Menu Button ពេលចាប់ផ្ដើម Bot
 async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
 
+# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង
 async def display_songs(message_or_query):
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
@@ -115,7 +117,7 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Song data not found!")
         return
 
-    # ------------------ បើជាបទ FREE ដែលមិនបាច់ Confirm ------------------
+    # ------------------ បើជាបទ FREE ដែលដោនឡូតបានភ្លាមៗ (Track 1 & 2) ------------------
     if song.get("is_free"):
         await query.message.reply_text("🎉 Downloading and sending to you...", parse_mode="Markdown")
         try:
@@ -132,18 +134,20 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("❌ There was an error sending the song file! Please try again.")
         return
 
-    # ------------------ បើជាបទដែលត្រូវទារការ Confirm / បង់ប្រាក់ ------------------
+    # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm (Track 3, 4, 5) ------------------
     context.user_data["pending_song_id"] = song_id
-    qr_file_to_send = song.get("qr_code", DEFAULT_QR_CODE)
 
+    # ប្រសិនបើជាបទ FREE (Track 3)
     if song.get("price") == "FREE":
         caption_text = (
             f"ℹ️ **Request Information**\n\n"
             f"🎵 **Song:** {song['title']}\n"
             f"💰 **Price:** FREE\n\n"
-            f"Please send a message/confirmation receipt to Admin for approval 📥"
+            f"សូមរង់ចាំបន្តិច... ខ្ញុំបានផ្ញើសំណើរបស់អ្នកទៅកាន់ Admin ហើយ។\n"
+            f"Admin នឹងពិនិត្យនិងផ្ញើជូនអ្នកឆាប់ៗនេះ! 🙏"
         )
     else:
+        # ប្រសិនបើជាបទត្រូវបង់ប្រាក់ (Track 4 & 5)
         caption_text = (
             f"💳 **Payment Information**\n\n"
             f"🎵 **Song:** {song['title']}\n"
@@ -151,18 +155,56 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Once you have paid, please send the receipt image to me 📥"
         )
 
-    try:
-        with open(qr_file_to_send, "rb") as qr_img:
-            await query.message.reply_photo(
-                photo=qr_img,
-                caption=caption_text,
+    # បើមាន QR Code (បទត្រូវបង់លុយ) ទើបផ្ញើរូបភាព បើគ្មានទេផ្ញើតែសារ
+    if song.get("qr_code"):
+        try:
+            with open(song["qr_code"], "rb") as qr_img:
+                await query.message.reply_photo(
+                    photo=qr_img,
+                    caption=caption_text,
+                    parse_mode="Markdown"
+                )
+        except FileNotFoundError:
+            await query.message.reply_text(
+                f"❌ QR Code file `{song['qr_code']}` not found!\n\n" + caption_text,
                 parse_mode="Markdown"
             )
-    except FileNotFoundError:
-        await query.message.reply_text(
-            f"❌ File `{qr_file_to_send}` not found!\n\n" + caption_text,
-            parse_mode="Markdown"
+    else:
+        # ផ្ញើតែសារអត្ថបទសម្រាប់ Track 3 (គ្មាន QR Code)
+        await query.message.reply_text(caption_text, parse_mode="Markdown")
+
+        # ផ្ញើសារជូនដំណឹងទៅកាន់ Admin Group ភ្លាមៗ (ដោយសារមិនបាច់ចាំផ្ញើរូប Receipt)
+        user = query.from_user
+        order_key = f"{user.id}_{song_id}"
+        context.bot_data[order_key] = {
+            "user_id": user.id,
+            "song_id": song_id
+        }
+
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Confirm", callback_data=f"cfm_{order_key}"),
+                InlineKeyboardButton("❌ Reject", callback_data=f"rej_{order_key}")
+            ]
+        ]
+
+        admin_caption = (
+            f"🔔 **New Free Request Received!**\n\n"
+            f"👤 **Customer:** {user.full_name} (@{user.username if user.username else 'No Username'})\n"
+            f"🆔 **User ID:** `{user.id}`\n"
+            f"🎵 **Song:** {song['title']}\n"
+            f"💰 **Price:** {song['price']}\n\n"
         )
+
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_GROUP_ID,
+                text=admin_caption,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logging.error(f"Error sending request to admin group: {e}")
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -189,7 +231,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
 
     admin_caption = (
-        f"🔔 **New Request Received!**\n\n"
+        f"🔔 **New Payment Received!**\n\n"
         f"👤 **Customer:** {user.full_name} (@{user.username if user.username else 'No Username'})\n"
         f"🆔 **User ID:** `{user.id}`\n"
         f"🎵 **Song:** {song['title']}\n"
@@ -210,7 +252,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     except Exception as e:
         logging.error(f"Error sending receipt to group: {e}")
-        await update.message.reply_text("❌ There was an error sending the request to the Admin!")
+        await update.message.reply_text("❌ There was an error sending the receipt to the Admin!")
 
 async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -253,11 +295,19 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
 
-        await query.edit_message_caption(
-            caption=f"{query.message.caption}\n\n✅ **[Confirmed and song sent]**",
-            reply_markup=None,
-            parse_mode="Markdown"
-        )
+        # ធ្វើបច្ចុប្បន្នភាពសាររបស់ Admin
+        if query.message.photo:
+            await query.edit_message_caption(
+                caption=f"{query.message.caption}\n\n✅ **[Confirmed and song sent]**",
+                reply_markup=None,
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text(
+                text=f"{query.message.text}\n\n✅ **[Confirmed and song sent]**",
+                reply_markup=None,
+                parse_mode="Markdown"
+            )
 
     except Exception as e:
         logging.error(f"Error sending song to client: {e}")
@@ -292,11 +342,18 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        await query.edit_message_caption(
-            caption=f"{query.message.caption}\n\n❌ **[Rejected]**",
-            reply_markup=None,
-            parse_mode="Markdown"
-        )
+        if query.message.photo:
+            await query.edit_message_caption(
+                caption=f"{query.message.caption}\n\n❌ **[Rejected]**",
+                reply_markup=None,
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text(
+                text=f"{query.message.text}\n\n❌ **[Rejected]**",
+                reply_markup=None,
+                parse_mode="Markdown"
+            )
 
     except Exception as e:
         logging.error(f"Error rejecting order: {e}")
@@ -318,4 +375,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+    
