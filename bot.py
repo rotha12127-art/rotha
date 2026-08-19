@@ -87,27 +87,16 @@ async def post_init(application):
         BotCommand("start", "Start the bot")
     ])
 
-# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង
+# អនុគមន៍សម្រាប់បង្ហាញបញ្ជីចម្រៀង (ដកសញ្ញា ✅ ចេញ)
 async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
-    if hasattr(message_or_query, 'from_user'):
-        user_id = message_or_query.from_user.id
-    else:
-        user_id = message_or_query.chat.id
-
-    purchased_songs = context.bot_data.get("purchased_songs", {})
-    user_purchased = purchased_songs.get(user_id, set())
-
     keyboard = []
     for s_id, info in SONGS_DATABASE.items():
-        has_purchased = s_id in user_purchased
-        status_icon = "✅ " if has_purchased else ""
-
         if info.get("price") == "FREE":
-            label = f"{status_icon}🎧 {info['title']} - FREE"
+            label = f"🎧 {info['title']} - FREE"
         elif "strike_price" in info:
-            label = f"{status_icon}🎧 {info['title']} - {info['strike_price']}  {info['price']}"
+            label = f"🎧 {info['title']} - {info['strike_price']}  {info['price']}"
         else:
-            label = f"{status_icon}🎧 {info['title']} - {info['price']}"
+            label = f"🎧 {info['title']} - {info['price']}"
             
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
@@ -120,14 +109,6 @@ async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
         await message_or_query.edit_message_text(text, reply_markup=reply_markup)
     else:
         await message_or_query.reply_text(text, reply_markup=reply_markup)
-
-# អនុគមន៍សម្រាប់ Mark ថា user បានទទួលចម្រៀងរួចរាល់
-def mark_song_as_purchased(context: ContextTypes.DEFAULT_TYPE, user_id: int, song_id: str):
-    if "purchased_songs" not in context.bot_data:
-        context.bot_data["purchased_songs"] = {}
-    if user_id not in context.bot_data["purchased_songs"]:
-        context.bot_data["purchased_songs"][user_id] = set()
-    context.bot_data["purchased_songs"][user_id].add(song_id)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await display_songs(update.message, context)
@@ -160,7 +141,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         caption=f"🎧 **{song['title']}**",
                         parse_mode="Markdown"
                     )
-            mark_song_as_purchased(context, query.from_user.id, song_id)
             await loading_msg.delete()
         except Exception as e:
             logging.error(f"Error sending free song: {e}")
@@ -345,8 +325,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown"
                 )
 
-        mark_song_as_purchased(context, client_user_id, song_id)
-
         if query.message.photo:
             await query.edit_message_caption(
                 caption=f"{query.message.caption}\n\n✅ <b>[Confirmed and song sent]</b>",
@@ -426,4 +404,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+    
