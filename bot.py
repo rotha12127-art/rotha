@@ -60,7 +60,7 @@ SONGS_DATABASE = {
     },
     "song_5": {
         "title": "Track 5",
-        "price": "999.99 USD",
+        "price": "19.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
         "qr_code": "track5_qr.png",  # QR Code ផ្សេងសម្រាប់ Track 5
