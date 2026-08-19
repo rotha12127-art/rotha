@@ -52,7 +52,7 @@ SONGS_DATABASE = {
         "original_price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
-        "qr_code": "acleda_qr.png",
+        "qr_code": "一剪梅.png",
     },
     "song_4": {
         "title": "Track 4",
