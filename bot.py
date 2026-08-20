@@ -89,7 +89,7 @@ async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for s_id, info in Config.SONGS_DATABASE.items():
         # កែសម្រួលត្រង់នេះ ឱ្យបង្ហាញតែ Title លើប៊ូតុង (មិនបាច់មានតម្លៃ)
-        label = f"🎵 {info['title']}"
+        label = f"{info['title']}"
             
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
