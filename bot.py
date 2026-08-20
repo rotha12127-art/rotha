@@ -49,31 +49,32 @@ async def self_ping():
                 logging.error(f"Self-ping failed: {e}")
             await asyncio.sleep(300)
 
-# ==================== ការកំណត់ព័ត៌មាន (CONFIGURATION) ====================
-
-BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
-ADMIN_GROUP_ID = "-1004401338807"
-
-# បញ្ជីចម្រៀង (បានដកបទ "下辈子还要还要和你成个家" ចេញរួចរាល់)
-SONGS_DATABASE = {
-    "song_3": {
-        "title": "一剪梅",
-        "price": "0.99 USD",
-        "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶",
-        "original_price": "9.99 USD",
-        "is_free": False,
-        "file_path": "一剪梅.mp3",
-        "qr_code": "一剪梅.png",
-    },
-    "song_4": {
-        "title": "Track 4",
-        "price": "9.99 USD",
-        "is_free": False,
-        "file_path": "5_6307483950365289011.mp3",
-        "qr_code": "acleda_qr.png",
-    },
-}
-
+# =========================================================================
+#                    ALL-IN-ONE CONFIGURATION (កន្លែងកែព័ត៌មានទាំងអស់)
+# =========================================================================
+class Config:
+    BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
+    ADMIN_GROUP_ID = "-1004401338807"
+    
+    # ទីតាំងសម្រាប់កែសម្រួល Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ
+    SONGS_DATABASE = {
+        "song_3": {
+            "title": "一剪梅",
+            "price": "0.99 USD",
+            "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶",
+            "original_price": "9.99 USD",
+            "is_free": False,
+            "file_path": "一剪梅.mp3",
+            "qr_code": "一剪梅.png",
+        },
+        "song_4": {
+            "title": "Special Track V3",
+            "price": "9.99 USD",
+            "is_free": False,
+            "file_path": "5_6307483950365289011.mp3",
+            "qr_code": "acleda_qr.png",
+        },
+    }
 # =========================================================================
 
 logging.basicConfig(level=logging.INFO)
@@ -86,7 +87,7 @@ async def post_init(application):
 
 async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
-    for s_id, info in SONGS_DATABASE.items():
+    for s_id, info in Config.SONGS_DATABASE.items():
         if info.get("price") == "FREE":
             label = f" {info['title']} - FREE"
         elif "strike_price" in info:
@@ -119,13 +120,12 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     song_id = query.data.replace("buy_", "")
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
 
     if not song:
         await query.message.reply_text("❌ Song data not found!")
         return
 
-    # រក្សាទុក song_id ទុកសម្រាប់ពេល User ផ្ញើរូប Receipt ចូលមក
     context.user_data["pending_song_id"] = song_id
     user = query.from_user
 
@@ -166,14 +166,13 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     song_id = context.user_data.get("pending_song_id")
     info_msg_id = context.user_data.get("info_msg_id")
 
-    if not song_id or song_id not in SONGS_DATABASE:
+    if not song_id or song_id not in Config.SONGS_DATABASE:
         await update.message.reply_text("❌ Please select a song first by typing /start")
         return
 
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
-    # ផ្ញើសាររង់ចាំ ហើយរក្សាទុក wait_msg_id ដើម្បីលុបពេល Admin Approve
     wait_msg = await update.message.reply_text(
         "Please wait for the Admin to verify!\n"
         "The song will be sent to you automatically. ⏳"
@@ -203,9 +202,8 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     try:
-        # ផ្ញើរូប Receipt និងប៊ូតុងទៅកាន់ Admin Group ត្រង់កន្លែងនេះ
         await context.bot.send_photo(
-            chat_id=ADMIN_GROUP_ID,
+            chat_id=Config.ADMIN_GROUP_ID,
             photo=photo_file_id,
             caption=admin_caption,
             reply_markup=InlineKeyboardMarkup(keyboard),
@@ -238,7 +236,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info_msg_id = order_data.get("info_msg_id")
         wait_msg_id = order_data.get("wait_msg_id")
 
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
 
     if not song:
         await query.message.reply_text("❌ Song data not found!")
@@ -310,7 +308,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         song_id = order_data["song_id"]
         wait_msg_id = order_data.get("wait_msg_id")
 
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
     song_title = song['title'] if song else "Song"
 
     try:
@@ -344,7 +342,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"❌ Cannot send rejection message to client: {e}")
 
 def main():
-    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    app = Application.builder().token(Config.BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(show_songs, pattern="^view_songs$"))
