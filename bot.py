@@ -54,18 +54,18 @@ async def self_ping():
 BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 
-# បញ្ជីចម្រៀងដែលបានកែសម្រួល (ដក Track 1, Track 5, Track 6 ចេញ)
+# បញ្ជីចម្រៀងដែលបានកែសម្រួល
 SONGS_DATABASE = {
     "song_2": {
-        "title": "下辈子还要和你成个家",
+        "title": "下辈子还要还要和你成个家",
         "price": "FREE",
-        "is_free": False,      # FREE តែត្រូវចាំ Request Confirm ពី Admin (គ្មាន QR)
+        "is_free": False,
         "file_path": "5_6332401890327798194.mp3",
     },
     "song_3": {
         "title": "一剪梅",
         "price": "0.99 USD",
-        "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶", # សម្រាប់បង្ហាញលើ Inline Button
+        "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶",
         "original_price": "9.99 USD",
         "is_free": False,
         "file_path": "一剪梅.mp3",
@@ -149,10 +149,9 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await loading_msg.edit_text("❌ There was an error sending the song file! Please try again.")
         return
 
-    # ------------------ បើជាបទដែលត្រូវរង់ចាំ Admin Confirm ------------------
+    # ------------------ បើជាបទដែលត្រូវបង្ហាញ QR និងតម្លៃ ------------------
     context.user_data["pending_song_id"] = song_id
     user = query.from_user
-    order_key = f"{user.id}_{song_id}"
 
     if song.get("price") == "FREE":
         caption_text = (
@@ -193,38 +192,8 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if info_msg:
         context.user_data["info_msg_id"] = info_msg.message_id
-
-    # រក្សាទុកទិន្នន័យសម្រាប់ Admin Group
-    context.bot_data[order_key] = {
-        "user_id": user.id,
-        "song_id": song_id,
-        "info_msg_id": info_msg.message_id if info_msg else None
-    }
-
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Confirm", callback_data=f"cfm_{order_key}"),
-            InlineKeyboardButton("❌ Reject", callback_data=f"rej_{order_key}")
-        ]
-    ]
-
-    admin_caption = (
-        f"🔔 <b>New Request Received!</b>\n\n"
-        f"👤 <b>Customer:</b> {user.full_name} (@{user.username if user.username else 'No Username'})\n"
-        f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
-        f"🎵 <b>Song:</b> {song['title']}\n"
-        f"💰 <b>Price:</b> {song['price']}\n\n"
-    )
-
-    try:
-        await context.bot.send_message(
-            chat_id=ADMIN_GROUP_ID,
-            text=admin_caption,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        logging.error(f"Error sending request to admin group: {e}")
+    
+    # (បានលុបកូដផ្ញើសារចូល Admin Group ចេញពីទីនេះហើយ)
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -268,6 +237,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     try:
+        # ផ្ញើរូប Receipt និងទិន្នន័យទៅកាន់ Admin Group នៅពេលដែល User ផ្ញើរូបភាពមកតែប៉ុណ្ណោះ
         await context.bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
             photo=photo_file_id,
@@ -309,21 +279,18 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # លុបសារ Payment / Request Information
         if info_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=info_msg_id)
             except Exception as del_err:
                 logging.warning(f"Could not delete info message: {del_err}")
 
-        # លុបសារ "Please wait for the Admin to verify!"
         if wait_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=wait_msg_id)
             except Exception as del_err:
                 logging.warning(f"Could not delete wait message: {del_err}")
 
-        # ផ្ញើសារ Request approved សម្រាប់តែ song_3 ដល់ song_6 ប៉ុណ្ណោះ (song_2 មិនផ្ញើទេ)
         if song_id != "song_2":
             await context.bot.send_message(
                 chat_id=client_user_id,
@@ -382,7 +349,6 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     song_title = song['title'] if song else "Song"
 
     try:
-        # លុបសារ "Please wait for the Admin to verify!" ប្រសិនបើ Reject
         if wait_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=wait_msg_id)
