@@ -89,7 +89,7 @@ SONGS_DATABASE = {
         "price": "19.99 USD",
         "is_free": False,
         "file_path": "r1.mp3",
-        "qr_code": "track5_qr.png",
+        "qr_code": "19.99.png",
     },
     "song_6": {
         "title": "Track 6",
