@@ -96,7 +96,7 @@ SONGS_DATABASE = {
         "price": "29.99 USD",
         "is_free": False,
         "file_path": "track6.mp3",
-        "qr_code": "acleda_qr.png",
+        "qr_code": "29.99.png",
     },
 }
 
