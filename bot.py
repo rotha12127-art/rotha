@@ -54,14 +54,8 @@ async def self_ping():
 BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
 ADMIN_GROUP_ID = "-1004401338807"
 
-# បញ្ជីចម្រៀងដែលបានកែសម្រួល
+# បញ្ជីចម្រៀង (បានដកបទ "下辈子还要还要和你成个家" ចេញរួចរាល់)
 SONGS_DATABASE = {
-    "song_2": {
-        "title": "下辈子还要还要和你成个家",
-        "price": "FREE",
-        "is_free": False,
-        "file_path": "5_6332401890327798194.mp3",
-    },
     "song_3": {
         "title": "一剪梅",
         "price": "0.99 USD",
@@ -131,47 +125,21 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Song data not found!")
         return
 
-    # ------------------ បើជាបទ FREE ដែលដោនឡូតបានភ្លាមៗ ------------------
-    if song.get("is_free"):
-        loading_msg = await query.message.reply_text("Downloading and sending to you...", parse_mode="Markdown")
-        try:
-            if "file_path" in song:
-                with open(song["file_path"], "rb") as audio_file:
-                    await context.bot.send_audio(
-                        chat_id=query.from_user.id,
-                        audio=audio_file,
-                        caption=f" **{song['title']}**",
-                        parse_mode="Markdown"
-                    )
-            await loading_msg.delete()
-        except Exception as e:
-            logging.error(f"Error sending free song: {e}")
-            await loading_msg.edit_text("❌ There was an error sending the song file! Please try again.")
-        return
-
-    # ------------------ បើជាបទដែលត្រូវបង្ហាញ QR និងតម្លៃ ------------------
+    # រក្សាទុក song_id ទុកសម្រាប់ពេល User ផ្ញើរូប Receipt ចូលមក
     context.user_data["pending_song_id"] = song_id
     user = query.from_user
 
-    if song.get("price") == "FREE":
-        caption_text = (
-            f"ℹ️ <b>Request Information</b>\n\n"
-            f"🎵 <b>Song:</b> {song['title']}\n"
-            f"💰 <b>Status:</b> FREE (Pending Admin Approval)\n\n"
-            f"Please wait while the admin verifies your request. ⏳"
-        )
+    if "original_price" in song:
+        price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
     else:
-        if "original_price" in song:
-            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
-        else:
-            price_text = f"<b>{song['price']}</b>"
+        price_text = f"<b>{song['price']}</b>"
 
-        caption_text = (
-            f"💳 <b>Payment Information</b>\n\n"
-            f"🎵 <b>Song:</b> {song['title']}\n"
-            f"💰 <b>Price:</b> {price_text}\n\n"
-            f"Once you have paid, please send the receipt image to me 📥"
-        )
+    caption_text = (
+        f"💳 <b>Payment Information</b>\n\n"
+        f"🎵 <b>Song:</b> {song['title']}\n"
+        f"💰 <b>Price:</b> {price_text}\n\n"
+        f"Once you have paid, please send the receipt image to me 📥"
+    )
 
     info_msg = None
     if song.get("qr_code"):
@@ -192,8 +160,6 @@ async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if info_msg:
         context.user_data["info_msg_id"] = info_msg.message_id
-    
-    # (បានលុបកូដផ្ញើសារចូល Admin Group ចេញពីទីនេះហើយ)
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -237,7 +203,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     try:
-        # ផ្ញើរូប Receipt និងទិន្នន័យទៅកាន់ Admin Group នៅពេលដែល User ផ្ញើរូបភាពមកតែប៉ុណ្ណោះ
+        # ផ្ញើរូប Receipt និងប៊ូតុងទៅកាន់ Admin Group ត្រង់កន្លែងនេះ
         await context.bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
             photo=photo_file_id,
@@ -291,12 +257,11 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as del_err:
                 logging.warning(f"Could not delete wait message: {del_err}")
 
-        if song_id != "song_2":
-            await context.bot.send_message(
-                chat_id=client_user_id,
-                text="🎉 Request approved! Here is your song file:",
-                parse_mode="Markdown"
-            )
+        await context.bot.send_message(
+            chat_id=client_user_id,
+            text="🎉 Request approved! Here is your song file:",
+            parse_mode="Markdown"
+        )
 
         if "file_path" in song:
             with open(song["file_path"], "rb") as audio_file:
