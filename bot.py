@@ -65,15 +65,9 @@ class Config:
             "original_price": "9.99 USD",
             "is_free": False,
             "file_path": "一剪梅.mp3",
-            "qr_code": "一剪梅.png",
+            "qr_code": "aa.png",
         },
-        "song_4": {
-            "title": "Special Track V3",
-            "price": "9.99 USD",
-            "is_free": False,
-            "file_path": "5_6307483950365289011.mp3",
-            "qr_code": "acleda_qr.png",
-        },
+        
     }
 # =========================================================================
 
