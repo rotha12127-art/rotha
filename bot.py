@@ -57,21 +57,21 @@ class Config:
     ADMIN_GROUP_ID = "-1004401338807"
     WEBSITE_URL = "https://rotharemix.netlify.app"
 
-# 🎵 Database ចម្រៀង (តូទ័រភ្ជាប់ទៅ Folder music/ ស្របតាម Website របស់អ្នក)
+# 🎵 Database ចម្រៀង (តូទ័រភ្ជាប់ទៅ URL ឯកសារ MP3 บน Netlify  trực tiếp)
 SONGS_DATABASE = {
     "YY1ZL": {
         "title": "一剪梅",
         "price": "0.99 USD",
         "original_price": "9.99 USD",
         "is_free": False,
-        "file_path": "music/song6.mp3", # ចូលទៅក្នុង Folder music យក song6.mp3
+        "file_url": "https://rotharemix.netlify.app/music/song6.mp3", # Download ផ្ទាល់ពី Netlify
         "qr_code": "aa.png"
     },
     "99KLP": {
         "title": "A Remix - គូកម្ម Remix",
         "price": "FREE LISTEN",
         "is_free": True,
-        "file_path": "music/song4.mp3" # ចូលទៅក្នុង Folder music យក song4.mp3
+        "file_url": "https://rotharemix.netlify.app/music/song4.mp3" # Download ផ្ទាល់ពី Netlify
     }
 }
 
@@ -292,16 +292,24 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        if "file_path" in song and os.path.exists(song["file_path"]):
-            with open(song["file_path"], "rb") as audio_file:
-                await context.bot.send_audio(
-                    chat_id=client_user_id,
-                    audio=audio_file,
-                    caption=f"🎵 **{song['title']}**",
-                    parse_mode="Markdown"
-                )
+        # ទាញយក File MP3 ពី Website មកផ្ញើជូនអតិថិជនដោយស្វ័យប្រវត្តិ
+        file_url = song.get("file_url")
+        if file_url:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(file_url, timeout=30)
+                if res.status_code == 200:
+                    audio_bytes = res.content
+                    await context.bot.send_audio(
+                        chat_id=client_user_id,
+                        audio=audio_bytes,
+                        filename=os.path.basename(file_url),
+                        caption=f"🎵 **{song['title']}**",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await context.bot.send_message(chat_id=client_user_id, text=f"⚠️ Could not download audio file from website.")
         else:
-            await context.bot.send_message(chat_id=client_user_id, text=f"⚠️ Audio file path `{song.get('file_path')}` not found on server.")
+            await context.bot.send_message(chat_id=client_user_id, text=f"⚠️ Audio file URL not configured.")
 
         if query.message.photo:
             await query.edit_message_caption(
