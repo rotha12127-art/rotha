@@ -56,18 +56,16 @@ class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
     
-    # ទីតាំងសម្រាប់កែសម្រួល Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ
+    # ទីតាំងសម្រាប់កែសម្រួល Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ (Key គឺ Song Code)
     SONGS_DATABASE = {
         "song_3": {
             "title": "一剪梅",
             "price": "0.99 USD",
-            "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶",
             "original_price": "9.99 USD",
             "is_free": False,
             "file_path": "一剪梅.mp3",
             "qr_code": "aa.png",
         },
-        
     }
 # =========================================================================
 
@@ -79,77 +77,109 @@ async def post_init(application):
     ])
     asyncio.create_task(self_ping())
 
-async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = []
-    for s_id, info in Config.SONGS_DATABASE.items():
-        # កែសម្រួលត្រង់នេះ ឱ្យបង្ហាញតែ Title លើប៊ូតុង (មិនបាច់មានតម្លៃ)
-        label = f"{info['title']}"
-            
-        keyboard.append([
-            InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
-        ])
-    
-    text = "Please select the song you want:"
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    if hasattr(message_or_query, 'edit_message_text'):
-        await message_or_query.edit_message_text(text, reply_markup=reply_markup)
-    else:
-        await message_or_query.reply_text(text, reply_markup=reply_markup)
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await display_songs(update.message, context)
+    # សម្អាតទិន្នន័យចាស់សិនពេលចាប់ផ្តើម
+    context.user_data.pop("pending_song_id", None)
+    await update.message.reply_text("Please send the song code you want to buy:")
 
-async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await display_songs(query, context)
-
-async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    song_id = query.data.replace("buy_", "")
-    song = Config.SONGS_DATABASE.get(song_id)
-
-    if not song:
-        await query.message.reply_text("❌ Song data not found!")
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    
+    # စစ်និតមើលថាតើ text ដែលផ្ញើមក ត្រូវនឹង Song Code ក្នុង Database ដែរឬទេ
+    if text in Config.SONGS_DATABASE:
+        song_id = text
+        song = Config.SONGS_DATABASE[song_id]
+        context.user_data["temp_song_id"] = song_id
+        
+        if "original_price" in song:
+            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
+        else:
+            price_text = f"<b>{song['price']}</b>"
+            
+        confirmation_text = (
+            f"🎵 <b>Song Found!</b>\n\n"
+            f"<b>Title:</b> {song['title']}\n"
+            f"<b>Price:</b> {price_text}\n\n"
+            f"Is this the song you want to buy?"
+        )
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("Yes", callback_data=f"confirm_yes_{song_id}"),
+                InlineKeyboardButton("No", callback_data="confirm_no")
+            ]
+        ]
+        
+        await update.message.reply_text(
+            confirmation_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    else:
+        # បើផ្ញើមកមិនមែនជា Code ត្រឹមត្រូវ គឺមិនឆ្លើយតបអ្វីទាំងអស់ (Ignore)
         return
 
-    context.user_data["pending_song_id"] = song_id
-    user = query.from_user
+async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    
+    if data.startswith("confirm_yes_"):
+        song_id = data.replace("confirm_yes_", "")
+        song = Config.SONGS_DATABASE.get(song_id)
+        
+        if not song:
+            await query.message.reply_text("❌ Song data not found!")
+            return
+            
+        context.user_data["pending_song_id"] = song_id
+        
+        if "original_price" in song:
+            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
+        else:
+            price_text = f"<b>{song['price']}</b>"
 
-    if "original_price" in song:
-        price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
-    else:
-        price_text = f"<b>{song['price']}</b>"
+        caption_text = (
+            f"💳 <b>Payment Information</b>\n\n"
+            f"🎵 <b>Song:</b> {song['title']}\n"
+            f"💰 <b>Price:</b> {price_text}\n\n"
+            f"Once you have paid, please send the receipt image to me 📥"
+        )
 
-    caption_text = (
-        f"💳 <b>Payment Information</b>\n\n"
-        f"🎵 <b>Song:</b> {song['title']}\n"
-        f"💰 <b>Price:</b> {price_text}\n\n"
-        f"Once you have paid, please send the receipt image to me 📥"
-    )
-
-    info_msg = None
-    if song.get("qr_code"):
-        try:
-            with open(song["qr_code"], "rb") as qr_img:
-                info_msg = await query.message.reply_photo(
-                    photo=qr_img,
-                    caption=caption_text,
+        info_msg = None
+        if song.get("qr_code"):
+            try:
+                with open(song["qr_code"], "rb") as qr_img:
+                    info_msg = await query.message.reply_photo(
+                        photo=qr_img,
+                        caption=caption_text,
+                        parse_mode="HTML"
+                    )
+            except FileNotFoundError:
+                info_msg = await query.message.reply_text(
+                    f"❌ QR Code file `{song['qr_code']}` not found!\n\n" + caption_text,
                     parse_mode="HTML"
                 )
-        except FileNotFoundError:
-            info_msg = await query.message.reply_text(
-                f"❌ QR Code file `{song['qr_code']}` not found!\n\n" + caption_text,
-                parse_mode="HTML"
-            )
-    else:
-        info_msg = await query.message.reply_text(caption_text, parse_mode="HTML")
+        else:
+            info_msg = await query.message.reply_text(caption_text, parse_mode="HTML")
 
-    if info_msg:
-        context.user_data["info_msg_id"] = info_msg.message_id
+        if info_msg:
+            context.user_data["info_msg_id"] = info_msg.message_id
+            
+        # លុបសារផ្ទៀងផ្ទាត់ចាស់ចោលដើម្បីកុំឱ្យរញ៉េរញ៉ៃ
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+
+    elif data == "confirm_no":
+        context.user_data.pop("temp_song_id", None)
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await query.message.reply_text("Please send a song code you want to buy again")
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -157,7 +187,6 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     info_msg_id = context.user_data.get("info_msg_id")
 
     if not song_id or song_id not in Config.SONGS_DATABASE:
-        await update.message.reply_text("❌ Please select a song first by typing /start")
         return
 
     song = Config.SONGS_DATABASE.get(song_id)
@@ -335,8 +364,13 @@ def main():
     app = Application.builder().token(Config.BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(show_songs, pattern="^view_songs$"))
-    app.add_handler(CallbackQueryHandler(buy_song, pattern="^buy_"))
+    
+    # Handler សម្រាប់ຮັບអត្ថបទ (Text) ដែលអតិថិជនផ្ញើកូដបទចម្រៀងមក
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
+    
+    # Handler សម្រាប់ប៊ូតុង Yes / No
+    app.add_handler(CallbackQueryHandler(confirm_song_choice, pattern="^confirm_"))
+    
     app.add_handler(CallbackQueryHandler(admin_approve, pattern="^cfm_"))
     app.add_handler(CallbackQueryHandler(admin_reject, pattern="^rej_"))
     
