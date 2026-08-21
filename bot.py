@@ -4,7 +4,6 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import httpx
-import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
 from telegram.ext import (
     Application,
@@ -51,75 +50,26 @@ async def self_ping():
             await asyncio.sleep(300)
 
 # =========================================================================
-#                    CONFIGURATION
+#                    ALL-IN-ONE CONFIGURATION (កន្លែងកែព័ត៌មានទាំងអស់)
 # =========================================================================
 class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
-    WEBSITE_URL = "https://rotharemix.netlify.app"
-    SONGS_JS_URL = "https://rotharemix.netlify.app/songs.js"
-
-# Global Variable សម្រាប់ផ្ទុកទិន្នន័យចម្រៀងទាញពី Website
-SONGS_DATABASE = {}
-
-async def fetch_songs_from_website():
-    """Function ទាញយកទិន្នន័យពី songs.js លើ Website មកប្រើក្នុង Bot យ៉ាងជាក់លាក់"""
-    global SONGS_DATABASE
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(Config.SONGS_JS_URL, timeout=15)
-            if response.status_code == 200:
-                js_content = response.text
-                parsed_songs = {}
-                
-                # បែងចែកជា Block របស់ Object នីមួយៗក្នុង songsData
-                objects = re.split(r'\{', js_content)
-                for obj in objects:
-                    if 'trackCode' in obj:
-                        song_data = {}
-                        
-                        # ទាញយក trackCode
-                        track_code_match = re.search(r'trackCode\s*:\s*["\']([^"\']+)["\']', obj)
-                        if track_code_match:
-                            song_data['trackCode'] = track_code_match.group(1)
-                            
-                        # ទាញយក title
-                        title_match = re.search(r'title\s*:\s*["\']([^"\']+)["\']', obj)
-                        if title_match:
-                            song_data['title'] = title_match.group(1)
-                            
-                        # ទាញយក priceText (ជម្រះ HTML tags ចេញខ្លះបើចាំបាច់ ឬទាញយកអត្ថបទ)
-                        price_match = re.search(r'priceText\s*:\s*["\']([^"\']+)["\']', obj)
-                        if price_match:
-                            raw_price = price_match.group(1)
-                            # ដក tag HTML ចេញបើមាន ដើម្បីឱ្យស្អាតក្នុង Telegram
-                            clean_price = re.sub(r'<[^>]+>', '', raw_price).strip()
-                            song_data['priceText'] = clean_price if clean_price else "Paid Song"
-                            
-                        # ទាញយក audioFile
-                        audio_match = re.search(r'audioFile\s*:\s*["\']([^"\']+)["\']', obj)
-                        if audio_match:
-                            song_data['audioFile'] = audio_match.group(1)
-
-                        track_code = song_data.get('trackCode')
-                        if track_code:
-                            audio_file = song_data.get('audioFile', '')
-                            if audio_file.startswith('./'):
-                                audio_file = audio_file.replace('./', '/')
-                            full_audio_url = f"{Config.WEBSITE_URL}{audio_file}"
-                            
-                            parsed_songs[track_code] = {
-                                "id": track_code,
-                                "title": song_data.get('title', 'Unknown Title'),
-                                "price": song_data.get('priceText', '0.00 USD'),
-                                "file_url": full_audio_url,
-                                "qr_code": "aa.png"
-                            }
-                if parsed_songs:
-                    SONGS_DATABASE = parsed_songs
-                    logging.info(f"Successfully loaded {len(SONGS_DATABASE)} songs from songs.js")
-        except Exception as e:
-            logging.error(f"Failed to fetch songs.js: {e}")
+    
+    # ទីតាំងសម្រាប់កែសម្រួល Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ
+    SONGS_DATABASE = {
+        "song_3": {
+            "title": "一剪梅",
+            "price": "0.99 USD",
+            "strike_price": "9̶.̶9̶9̶ ̶U̶S̶D̶",
+            "original_price": "9.99 USD",
+            "is_free": False,
+            "file_path": "一剪梅.mp3",
+            "qr_code": "aa.png",
+        },
+        
+    }
+# =========================================================================
 
 logging.basicConfig(level=logging.INFO)
 
@@ -127,122 +77,90 @@ async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
-    await fetch_songs_from_website()
     asyncio.create_task(self_ping())
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.pop("pending_song_id", None)
-    
-    welcome_text = (
-        "🎵 **Welcome to Rotha Remix Bot!**\n\n"
-        f"🌐 **Website:** [Click here to visit website]({Config.WEBSITE_URL})\n\n"
-        "👉 Please send the song code you want to buy (e.g. YY1ZL):"
-    )
-    
-    await update.message.reply_text(welcome_text, parse_mode="Markdown", disable_web_page_preview=True)
-
-async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip().replace("#", "")
-    
-    if not SONGS_DATABASE:
-        await fetch_songs_from_website()
-
-    if text in SONGS_DATABASE:
-        song_id = text
-        song = SONGS_DATABASE[song_id]
-        context.user_data["temp_song_id"] = song_id
+async def display_songs(message_or_query, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = []
+    for s_id, info in Config.SONGS_DATABASE.items():
+        # កែសម្រួលត្រង់នេះ ឱ្យបង្ហាញតែ Title លើប៊ូតុង (មិនបាច់មានតម្លៃ)
+        label = f"{info['title']}"
             
-        confirmation_text = (
-            f"🎵 <b>Song Found!</b>\n\n"
-            f"<b>Title:</b> {song['title']}\n"
-            f"<b>Price:</b> <b>{song['price']}</b>\n\n"
-            f"Is this the song you want to buy?"
-        )
-        
-        keyboard = [
-            [
-                InlineKeyboardButton("Yes", callback_data=f"confirm_yes_{song_id}"),
-                InlineKeyboardButton("No", callback_data="confirm_no")
-            ]
-        ]
-        
-        await update.message.reply_text(
-            confirmation_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
-    else:
-        await update.message.reply_text("❌ Song code not found! Please check the code on the website again.")
+        keyboard.append([
+            InlineKeyboardButton(label, callback_data=f"buy_{s_id}")
+        ])
+    
+    text = "Please select the song you want:"
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if hasattr(message_or_query, 'edit_message_text'):
+        await message_or_query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        await message_or_query.reply_text(text, reply_markup=reply_markup)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await display_songs(update.message, context)
+
+async def show_songs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    data = query.data
-    
-    if data.startswith("confirm_yes_"):
-        song_id = data.replace("confirm_yes_", "")
-        song = SONGS_DATABASE.get(song_id)
-        
-        if not song:
-            await query.message.reply_text("❌ Song data not found!")
-            return
-            
-        context.user_data["pending_song_id"] = song_id
+    await display_songs(query, context)
 
-        caption_text = (
-            f"💳 <b>Payment Information</b>\n\n"
-            f"🎵 <b>Song:</b> {song['title']}\n"
-            f"💰 <b>Price:</b> <b>{song['price']}</b>\n\n"
-            f"Once you have paid, please send the receipt image to me 📥"
-        )
+async def buy_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-        info_msg = None
-        qr_code_file = song.get("qr_code", "aa.png")
-        if os.path.exists(qr_code_file):
-            try:
-                with open(qr_code_file, "rb") as qr_img:
-                    info_msg = await query.message.reply_photo(
-                        photo=qr_img,
-                        caption=caption_text,
-                        parse_mode="HTML"
-                    )
-            except Exception:
-                pass
-        
-        if not info_msg:
-            info_msg = await query.message.reply_text(caption_text, parse_mode="HTML")
+    song_id = query.data.replace("buy_", "")
+    song = Config.SONGS_DATABASE.get(song_id)
 
-        if info_msg:
-            context.user_data["info_msg_id"] = info_msg.message_id
-            
+    if not song:
+        await query.message.reply_text("❌ Song data not found!")
+        return
+
+    context.user_data["pending_song_id"] = song_id
+    user = query.from_user
+
+    if "original_price" in song:
+        price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
+    else:
+        price_text = f"<b>{song['price']}</b>"
+
+    caption_text = (
+        f"💳 <b>Payment Information</b>\n\n"
+        f"🎵 <b>Song:</b> {song['title']}\n"
+        f"💰 <b>Price:</b> {price_text}\n\n"
+        f"Once you have paid, please send the receipt image to me 📥"
+    )
+
+    info_msg = None
+    if song.get("qr_code"):
         try:
-            await query.message.delete()
-        except Exception:
-            pass
+            with open(song["qr_code"], "rb") as qr_img:
+                info_msg = await query.message.reply_photo(
+                    photo=qr_img,
+                    caption=caption_text,
+                    parse_mode="HTML"
+                )
+        except FileNotFoundError:
+            info_msg = await query.message.reply_text(
+                f"❌ QR Code file `{song['qr_code']}` not found!\n\n" + caption_text,
+                parse_mode="HTML"
+            )
+    else:
+        info_msg = await query.message.reply_text(caption_text, parse_mode="HTML")
 
-    elif data == "confirm_no":
-        context.user_data.pop("temp_song_id", None)
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-            
-        no_text = (
-            f"🌐 **Website:** [Click here to visit website]({Config.WEBSITE_URL})\n\n"
-            "👉 Please send the song code you want to buy:"
-        )
-        await query.message.reply_text(no_text, parse_mode="Markdown", disable_web_page_preview=True)
+    if info_msg:
+        context.user_data["info_msg_id"] = info_msg.message_id
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     song_id = context.user_data.get("pending_song_id")
     info_msg_id = context.user_data.get("info_msg_id")
 
-    if not song_id or song_id not in SONGS_DATABASE:
+    if not song_id or song_id not in Config.SONGS_DATABASE:
+        await update.message.reply_text("❌ Please select a song first by typing /start")
         return
 
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
     wait_msg = await update.message.reply_text(
@@ -296,7 +214,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             parts = order_key.split("_")
             client_user_id = int(parts[0])
-            song_id = parts[1]
+            song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
             info_msg_id = None
             wait_msg_id = None
         except Exception:
@@ -308,7 +226,8 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info_msg_id = order_data.get("info_msg_id")
         wait_msg_id = order_data.get("wait_msg_id")
 
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
+
     if not song:
         await query.message.reply_text("❌ Song data not found!")
         return
@@ -317,14 +236,14 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if info_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=info_msg_id)
-            except Exception:
-                pass
+            except Exception as del_err:
+                logging.warning(f"Could not delete info message: {del_err}")
 
         if wait_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=wait_msg_id)
-            except Exception:
-                pass
+            except Exception as del_err:
+                logging.warning(f"Could not delete wait message: {del_err}")
 
         await context.bot.send_message(
             chat_id=client_user_id,
@@ -332,23 +251,14 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        file_url = song.get("file_url")
-        if file_url:
-            async with httpx.AsyncClient() as client:
-                res = await client.get(file_url, timeout=30)
-                if res.status_code == 200:
-                    audio_bytes = res.content
-                    await context.bot.send_audio(
-                        chat_id=client_user_id,
-                        audio=audio_bytes,
-                        filename=os.path.basename(file_url),
-                        caption=f"🎵 **{song['title']}**",
-                        parse_mode="Markdown"
-                    )
-                else:
-                    await context.bot.send_message(chat_id=client_user_id, text=f"⚠️ Could not download audio file from website.")
-        else:
-            await context.bot.send_message(chat_id=client_user_id, text=f"⚠️ Audio file URL not configured.")
+        if "file_path" in song:
+            with open(song["file_path"], "rb") as audio_file:
+                await context.bot.send_audio(
+                    chat_id=client_user_id,
+                    audio=audio_file,
+                    caption=f" **{song['title']}**\n",
+                    parse_mode="Markdown"
+                )
 
         if query.message.photo:
             await query.edit_message_caption(
@@ -378,7 +288,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             parts = order_key.split("_")
             client_user_id = int(parts[0])
-            song_id = parts[1]
+            song_id = f"{parts[1]}_{parts[2]}" if len(parts) > 2 else parts[1]
             wait_msg_id = None
         except Exception:
             await query.message.reply_text("❌ Order data not found!")
@@ -388,15 +298,15 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         song_id = order_data["song_id"]
         wait_msg_id = order_data.get("wait_msg_id")
 
-    song = SONGS_DATABASE.get(song_id)
+    song = Config.SONGS_DATABASE.get(song_id)
     song_title = song['title'] if song else "Song"
 
     try:
         if wait_msg_id:
             try:
                 await context.bot.delete_message(chat_id=client_user_id, message_id=wait_msg_id)
-            except Exception:
-                pass
+            except Exception as del_err:
+                logging.warning(f"Could not delete wait message on reject: {del_err}")
 
         await context.bot.send_message(
             chat_id=client_user_id,
@@ -425,10 +335,11 @@ def main():
     app = Application.builder().token(Config.BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
-    app.add_handler(CallbackQueryHandler(confirm_song_choice, pattern="^confirm_"))
+    app.add_handler(CallbackQueryHandler(show_songs, pattern="^view_songs$"))
+    app.add_handler(CallbackQueryHandler(buy_song, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(admin_approve, pattern="^cfm_"))
     app.add_handler(CallbackQueryHandler(admin_reject, pattern="^rej_"))
+    
     app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
 
     print("Bot is running...")
