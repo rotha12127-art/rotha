@@ -50,33 +50,26 @@ async def self_ping():
             await asyncio.sleep(300)
 
 # =========================================================================
-#                    ALL-IN-ONE CONFIGURATION (កន្លែងកែព័ត៌មានទាំងអស់)
+#                    CONFIGURATION (កន្លែងតំណភ្ជាប់ Website)
 # =========================================================================
 class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
     
-    # 📌 កន្លែងកែសម្រួល Song Code, Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ
-    SONGS_DATABASE = {
-        "song_3": {  # <--- នេះជា Song Code ដែលអតិថិជនត្រូវផ្ញើមក
-            "title": "一剪梅",
-            "price": "0.99 USD",
-            "original_price": "9.99 USD",
-            "is_free": False,
-            "file_path": "一剪梅.mp3",
-            "qr_code": "aa.png",
-        },
-        
-        # 💡 ឧទាហរណ៍ប្រសិនបើចង់ថែមបទផ្សេងទៀត (លុបសញ្ញា # ចោល):
-        # "song_2": {
-        #     "title": "Song Name 2",
-        #     "price": "2.00 USD",
-        #     "original_price": "5.00 USD",
-        #     "is_free": False,
-        #     "file_path": "song2.mp3",
-        #     "qr_code": "qr2.png",
-        # },
-    }
+    # 🔗 Link ទៅកាន់ File JSON នៅលើ Netlify Website របស់អ្នក
+    SONGS_JSON_URL = "https://rotharemix.netlify.app/songs.json"
+
+# Function សម្រាប់ទាញយក Database ពី Website មកប្រើប្រាស់
+async def fetch_songs_database():
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(Config.SONGS_JSON_URL, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+    except Exception as e:
+        logging.error(f"Failed to fetch songs from website: {e}")
+    return {}
+
 # =========================================================================
 
 logging.basicConfig(level=logging.INFO)
@@ -90,7 +83,6 @@ async def post_init(application):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("pending_song_id", None)
     
-    # សាររួមបញ្ចូល Website ជាមួយ Markdown/HTML ស្អាត
     welcome_text = (
         "🎵 **Welcome to Rotha Remix Bot!**\n\n"
         "🌐 **Website:** [Click here to visit website](https://rotharemix.netlify.app)\n\n"
@@ -102,10 +94,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
-    # ឆែកមើលថាតើ text ដែលផ្ញើមក មានក្នុង Song Code ដែរឬទេ
-    if text in Config.SONGS_DATABASE:
+    # ទាញទិន្នន័យថ្មីៗពី Website មកឆែក
+    songs_db = await fetch_songs_database()
+    
+    if text in songs_db:
         song_id = text
-        song = Config.SONGS_DATABASE[song_id]
+        song = songs_db[song_id]
         context.user_data["temp_song_id"] = song_id
         
         if "original_price" in song:
@@ -133,7 +127,6 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode="HTML"
         )
     else:
-        # បើផ្ញើមកមិនមែនជា Song Code ត្រឹមត្រូវ គឺមិនតបអ្វីទាំងអស់
         return
 
 async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -141,13 +134,14 @@ async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     
     data = query.data
+    songs_db = await fetch_songs_database()
     
     if data.startswith("confirm_yes_"):
         song_id = data.replace("confirm_yes_", "")
-        song = Config.SONGS_DATABASE.get(song_id)
+        song = songs_db.get(song_id)
         
         if not song:
-            await query.message.reply_text("❌ Song data not found!")
+            await query.message.reply_text("❌ Song data not found on website!")
             return
             
         context.user_data["pending_song_id"] = song_id
@@ -196,7 +190,6 @@ async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception:
             pass
             
-        # សារពេលចុច No ដែលមាន Website ដូចគ្នា
         no_text = (
             "🌐 **Website:** [Click here to visit website](https://rotharemix.netlify.app)\n\n"
             "👉 Please send the song code you want to buy:"
@@ -208,10 +201,11 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     song_id = context.user_data.get("pending_song_id")
     info_msg_id = context.user_data.get("info_msg_id")
 
-    if not song_id or song_id not in Config.SONGS_DATABASE:
+    songs_db = await fetch_songs_database()
+    if not song_id or song_id not in songs_db:
         return
 
-    song = Config.SONGS_DATABASE.get(song_id)
+    song = songs_db.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
     wait_msg = await update.message.reply_text(
@@ -277,10 +271,11 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info_msg_id = order_data.get("info_msg_id")
         wait_msg_id = order_data.get("wait_msg_id")
 
-    song = Config.SONGS_DATABASE.get(song_id)
+    songs_db = await fetch_songs_database()
+    song = songs_db.get(song_id)
 
     if not song:
-        await query.message.reply_text("❌ Song data not found!")
+        await query.message.reply_text("❌ Song data not found on website!")
         return
 
     try:
@@ -349,7 +344,8 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         song_id = order_data["song_id"]
         wait_msg_id = order_data.get("wait_msg_id")
 
-    song = Config.SONGS_DATABASE.get(song_id)
+    songs_db = await fetch_songs_database()
+    song = songs_db.get(song_id)
     song_title = song['title'] if song else "Song"
 
     try:
