@@ -63,32 +63,32 @@ class Config:
 SONGS_DATABASE = {}
 
 async def fetch_songs_from_website():
-    """Function សម្រាប់ទាញយកទិន្នន័យបទចម្រៀងពី songs.js លើ Website មកប្រើក្នុង Bot"""
+    """Function ទាញយកទិន្នន័យពី songs.js លើ Website មកប្រើក្នុង Bot យ៉ាងសុវត្ថិភាព"""
     global SONGS_DATABASE
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(Config.SONGS_JS_URL, timeout=15)
             if response.status_code == 200:
                 js_content = response.text
-                # แยกយកទិន្នន័យពី songsData array ក្នុង JS មកបំលែងជា Python Dictionary
-                # ស្វែងរក trackCode, id, title, audioFile, priceText, isPaid ជាដើម
                 parsed_songs = {}
                 
-                # ប្រើ Regex ដើម្បីទាញយកទិន្នន័យក្នុង Object នីមួយៗនៃ songsData
-                matches = re.findall(r'\{([^}]+)\}', js_content)
-                for match in matches:
-                    if 'trackCode' in match:
+                # ស្វែងរក Object នីមួយៗក្នុង songsData តាមរយៈ Regex
+                objects = re.findall(r'\{([^}]+)\}', js_content)
+                for obj in objects:
+                    if 'trackCode' in obj:
                         song_data = {}
-                        for line in match.split(','):
-                            if ':' in line:
-                                k, v = line.split(':', 1)
-                                k = k.strip()
-                                v = v.strip().strip("'\"")
-                                song_data[k] = v
-                        
+                        # ទាញយក Key និង Value នីមួយៗ
+                        pairs = re.findall(r'(\w+):\s*(["\'])(.*?)\2', obj)
+                        for key, quote, val in pairs:
+                            song_data[key] = val
+                            
+                        # ករណី Value ជា boolean ឬ Number (ដូចជា isPaid)
+                        bool_pairs = re.findall(r'(\w+):\s*(true|false)', obj, re.IGNORECASE)
+                        for key, val in bool_pairs:
+                            song_data[key] = (val.lower() == 'true')
+
                         track_code = song_data.get('trackCode')
                         if track_code:
-                            # កំណត់ URL ពេញរបស់ឯកសារអូឌីយ៉ូ
                             audio_file = song_data.get('audioFile', '')
                             if audio_file.startswith('./'):
                                 audio_file = audio_file.replace('./', '/')
@@ -98,15 +98,15 @@ async def fetch_songs_from_website():
                                 "id": song_data.get('id'),
                                 "title": song_data.get('title', 'Unknown Title'),
                                 "price": song_data.get('priceText', '0.00 USD'),
-                                "is_free": song_data.get('isPaid') != 'true',
+                                "is_free": not song_data.get('isPaid', False),
                                 "file_url": full_audio_url,
                                 "qr_code": "aa.png"
                             }
                 if parsed_songs:
                     SONGS_DATABASE = parsed_songs
-                    logging.info(f"Successfully loaded {len(SONGS_DATABASE)} songs from website.")
+                    logging.info(f"Successfully loaded {len(SONGS_DATABASE)} songs from songs.js")
         except Exception as e:
-            logging.error(f"Failed to fetch songs.js from website: {e}")
+            logging.error(f"Failed to fetch songs.js: {e}")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -114,7 +114,7 @@ async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
-    await fetch_songs_from_website() # ទាញយកទិន្នន័យពេល Bot ចាប់ផ្តើមដំណើរការ
+    await fetch_songs_from_website()
     asyncio.create_task(self_ping())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,7 +131,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace("#", "")
     
-    # ធ្វើការ update ទិន្នន័យចម្រៀងឡើងវិញរាល់ពេលមានគេផ្ញើសារមក (เผื่อមានការបន្ថែមបទថ្មីលើ Web)
     if not SONGS_DATABASE:
         await fetch_songs_from_website()
 
