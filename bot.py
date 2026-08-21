@@ -4,6 +4,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import httpx
+import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
 from telegram.ext import (
     Application,
@@ -56,24 +57,56 @@ class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
     WEBSITE_URL = "https://rotharemix.netlify.app"
+    SONGS_JS_URL = "https://rotharemix.netlify.app/songs.js"
 
-# 🎵 Database ចម្រៀង (តូទ័រភ្ជាប់ទៅ URL ឯកសារ MP3 บน Netlify  trực tiếp)
-SONGS_DATABASE = {
-    "YY1ZL": {
-        "title": "一剪梅",
-        "price": "0.99 USD",
-        "original_price": "9.99 USD",
-        "is_free": False,
-        "file_url": "https://rotharemix.netlify.app/music/song6.mp3", # Download ផ្ទាល់ពី Netlify
-        "qr_code": "aa.png"
-    },
-    "99KLP": {
-        "title": "A Remix - គូកម្ម Remix",
-        "price": "FREE LISTEN",
-        "is_free": True,
-        "file_url": "https://rotharemix.netlify.app/music/song4.mp3" # Download ផ្ទាល់ពី Netlify
-    }
-}
+# Global Variable សម្រាប់ផ្ទុកទិន្នន័យចម្រៀងទាញពី Website
+SONGS_DATABASE = {}
+
+async def fetch_songs_from_website():
+    """Function សម្រាប់ទាញយកទិន្នន័យបទចម្រៀងពី songs.js លើ Website មកប្រើក្នុង Bot"""
+    global SONGS_DATABASE
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(Config.SONGS_JS_URL, timeout=15)
+            if response.status_code == 200:
+                js_content = response.text
+                # แยกយកទិន្នន័យពី songsData array ក្នុង JS មកបំលែងជា Python Dictionary
+                # ស្វែងរក trackCode, id, title, audioFile, priceText, isPaid ជាដើម
+                parsed_songs = {}
+                
+                # ប្រើ Regex ដើម្បីទាញយកទិន្នន័យក្នុង Object នីមួយៗនៃ songsData
+                matches = re.findall(r'\{([^}]+)\}', js_content)
+                for match in matches:
+                    if 'trackCode' in match:
+                        song_data = {}
+                        for line in match.split(','):
+                            if ':' in line:
+                                k, v = line.split(':', 1)
+                                k = k.strip()
+                                v = v.strip().strip("'\"")
+                                song_data[k] = v
+                        
+                        track_code = song_data.get('trackCode')
+                        if track_code:
+                            # កំណត់ URL ពេញរបស់ឯកសារអូឌីយ៉ូ
+                            audio_file = song_data.get('audioFile', '')
+                            if audio_file.startswith('./'):
+                                audio_file = audio_file.replace('./', '/')
+                            full_audio_url = f"{Config.WEBSITE_URL}{audio_file}"
+                            
+                            parsed_songs[track_code] = {
+                                "id": song_data.get('id'),
+                                "title": song_data.get('title', 'Unknown Title'),
+                                "price": song_data.get('priceText', '0.00 USD'),
+                                "is_free": song_data.get('isPaid') != 'true',
+                                "file_url": full_audio_url,
+                                "qr_code": "aa.png"
+                            }
+                if parsed_songs:
+                    SONGS_DATABASE = parsed_songs
+                    logging.info(f"Successfully loaded {len(SONGS_DATABASE)} songs from website.")
+        except Exception as e:
+            logging.error(f"Failed to fetch songs.js from website: {e}")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -81,6 +114,7 @@ async def post_init(application):
     await application.bot.set_my_commands([
         BotCommand("start", "Start the bot")
     ])
+    await fetch_songs_from_website() # ទាញយកទិន្នន័យពេល Bot ចាប់ផ្តើមដំណើរការ
     asyncio.create_task(self_ping())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -97,20 +131,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace("#", "")
     
+    # ធ្វើការ update ទិន្នន័យចម្រៀងឡើងវិញរាល់ពេលមានគេផ្ញើសារមក (เผื่อមានការបន្ថែមបទថ្មីលើ Web)
+    if not SONGS_DATABASE:
+        await fetch_songs_from_website()
+
     if text in SONGS_DATABASE:
         song_id = text
         song = SONGS_DATABASE[song_id]
         context.user_data["temp_song_id"] = song_id
-        
-        if "original_price" in song:
-            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
-        else:
-            price_text = f"<b>{song['price']}</b>"
             
         confirmation_text = (
             f"🎵 <b>Song Found!</b>\n\n"
             f"<b>Title:</b> {song['title']}\n"
-            f"<b>Price:</b> {price_text}\n\n"
+            f"<b>Price:</b> <b>{song['price']}</b>\n\n"
             f"Is this the song you want to buy?"
         )
         
@@ -144,16 +177,11 @@ async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
             
         context.user_data["pending_song_id"] = song_id
-        
-        if "original_price" in song:
-            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
-        else:
-            price_text = f"<b>{song['price']}</b>"
 
         caption_text = (
             f"💳 <b>Payment Information</b>\n\n"
             f"🎵 <b>Song:</b> {song['title']}\n"
-            f"💰 <b>Price:</b> {price_text}\n\n"
+            f"💰 <b>Price:</b> <b>{song['price']}</b>\n\n"
             f"Once you have paid, please send the receipt image to me 📥"
         )
 
@@ -292,7 +320,6 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-        # ទាញយក File MP3 ពី Website មកផ្ញើជូនអតិថិជនដោយស្វ័យប្រវត្តិ
         file_url = song.get("file_url")
         if file_url:
             async with httpx.AsyncClient() as client:
