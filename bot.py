@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 import threading
+import json
+import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
@@ -56,16 +58,21 @@ class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
     
-    # 🔗 Link ទៅកាន់ File JSON នៅលើ Netlify Website របស់អ្នក
-    SONGS_JSON_URL = "https://rotharemix.netlify.app/songs.json"
+    # 🔗 Link ទៅកាន់ File songs.js នៅលើ Netlify Website របស់អ្នក
+    SONGS_JS_URL = "https://rotharemix.netlify.app/songs.js"
 
-# Function សម្រាប់ទាញយក Database ពី Website មកប្រើប្រាស់
+# Function សម្រាប់ទាញយកនិងបកប្រែទិន្នន័យពី songs.js របស់ Website
 async def fetch_songs_database():
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(Config.SONGS_JSON_URL, timeout=10)
+            response = await client.get(Config.SONGS_JS_URL, timeout=10)
             if response.status_code == 200:
-                return response.json()
+                content = response.text
+                # ស្រង់យកទិន្នន័យ JSON ចេញពី File JavaScript
+                match = re.search(r'\{.*\}', content, re.DOTALL)
+                if match:
+                    json_str = match.group(0)
+                    return json.loads(json_str)
     except Exception as e:
         logging.error(f"Failed to fetch songs from website: {e}")
     return {}
@@ -94,7 +101,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
-    # ទាញទិន្នន័យថ្មីៗពី Website មកឆែក
     songs_db = await fetch_songs_database()
     
     if text in songs_db:
