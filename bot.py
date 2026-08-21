@@ -2,8 +2,6 @@ import asyncio
 import logging
 import os
 import threading
-import json
-import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
@@ -37,7 +35,7 @@ threading.Thread(target=run_health_check_server, daemon=True).start()
 
 # ==================== Self-Ping Task (ការពារ Render Sleep) ====================
 async def self_ping():
-    url = "https://rotha.onrender.com"  # ជំនួសដោយ Link Render របស់អ្នកបើចាំបាច់
+    url = "https://rotha.onrender.com"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
     await asyncio.sleep(10)
@@ -52,45 +50,30 @@ async def self_ping():
             await asyncio.sleep(300)
 
 # =========================================================================
-#                    CONFIGURATION (កន្លែងកំណត់ Config)
+#                    CONFIGURATION
 # =========================================================================
 class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
-    
-    # 🔗 Link ទៅកាន់ File songs.js នៅលើ Netlify Website របស់អ្នក
-    SONGS_JS_URL = "https://rotharemix.netlify.app/songs.js"
+    WEBSITE_URL = "https://rotharemix.netlify.app"
 
-# Function សម្រាប់ទាញយកនិងបកប្រែទិន្នន័យពី songs.js របស់ Website
-async def fetch_songs_database():
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(Config.SONGS_JS_URL, timeout=10)
-            if response.status_code == 200:
-                content = response.text
-                # ស្រង់យកទិន្នន័យ Array (...) ចេញពី File JavaScript
-                match = re.search(r'\[.*\]', content, re.DOTALL)
-                if match:
-                    json_str = match.group(0)
-                    songs_list = json.loads(json_str)
-                    
-                    # แปลง List ទៅជា Dictionary ដោយយក trackCode ធ្វើជា Key
-                    songs_dict = {}
-                    for song in songs_list:
-                        track_code = song.get("trackCode")
-                        if track_code:
-                            songs_dict[track_code] = {
-                                "title": song.get("id"),
-                                "price": song.get("priceText", "Free"),
-                                "is_free": not song.get("isPaid", False),
-                                "file_path": song.get("audioFile"),
-                            }
-                    return songs_dict
-    except Exception as e:
-        logging.error(f"Failed to fetch songs from website: {e}")
-    return {}
-
-# =========================================================================
+# 🎵 Database ចម្រៀង (តូទ័រភ្ជាប់ទៅ Folder music/ ស្របតាម Website របស់អ្នក)
+SONGS_DATABASE = {
+    "YY1ZL": {
+        "title": "一剪梅",
+        "price": "0.99 USD",
+        "original_price": "9.99 USD",
+        "is_free": False,
+        "file_path": "music/song6.mp3", # ចូលទៅក្នុង Folder music យក song6.mp3
+        "qr_code": "aa.png"
+    },
+    "99KLP": {
+        "title": "A Remix - គូកម្ម Remix",
+        "price": "FREE LISTEN",
+        "is_free": True,
+        "file_path": "music/song4.mp3" # ចូលទៅក្នុង Folder music យក song4.mp3
+    }
+}
 
 logging.basicConfig(level=logging.INFO)
 
@@ -105,26 +88,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     welcome_text = (
         "🎵 **Welcome to Rotha Remix Bot!**\n\n"
-        "🌐 **Website:** [Click here to visit website](https://rotharemix.netlify.app)\n\n"
+        f"🌐 **Website:** [Click here to visit website]({Config.WEBSITE_URL})\n\n"
         "👉 Please send the song code you want to buy (e.g. YY1ZL):"
     )
     
     await update.message.reply_text(welcome_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
+    text = update.message.text.strip().replace("#", "")
     
-    songs_db = await fetch_songs_database()
-    
-    if text in songs_db:
+    if text in SONGS_DATABASE:
         song_id = text
-        song = songs_db[song_id]
+        song = SONGS_DATABASE[song_id]
         context.user_data["temp_song_id"] = song_id
+        
+        if "original_price" in song:
+            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
+        else:
+            price_text = f"<b>{song['price']}</b>"
             
         confirmation_text = (
             f"🎵 <b>Song Found!</b>\n\n"
-            f"<b>Title/ID:</b> {song['title']}\n"
-            f"<b>Price:</b> <b>{song['price']}</b>\n\n"
+            f"<b>Title:</b> {song['title']}\n"
+            f"<b>Price:</b> {price_text}\n\n"
             f"Is this the song you want to buy?"
         )
         
@@ -141,35 +127,38 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode="HTML"
         )
     else:
-        return
+        await update.message.reply_text("❌ Song code not found! Please check the code on the website again.")
 
 async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
     data = query.data
-    songs_db = await fetch_songs_database()
     
     if data.startswith("confirm_yes_"):
         song_id = data.replace("confirm_yes_", "")
-        song = songs_db.get(song_id)
+        song = SONGS_DATABASE.get(song_id)
         
         if not song:
-            await query.message.reply_text("❌ Song data not found on website!")
+            await query.message.reply_text("❌ Song data not found!")
             return
             
         context.user_data["pending_song_id"] = song_id
+        
+        if "original_price" in song:
+            price_text = f"<s>{song['original_price']}</s> <b>{song['price']}</b>"
+        else:
+            price_text = f"<b>{song['price']}</b>"
 
         caption_text = (
             f"💳 <b>Payment Information</b>\n\n"
             f"🎵 <b>Song:</b> {song['title']}\n"
-            f"💰 <b>Price:</b> <b>{song['price']}</b>\n\n"
+            f"💰 <b>Price:</b> {price_text}\n\n"
             f"Once you have paid, please send the receipt image to me 📥"
         )
 
         info_msg = None
-        # បើមានរូប QR code ដាក់បញ្ចូលទីនេះ ឬផ្ញើអត្ថបទធម្មតា
-        qr_code_file = "aa.png" 
+        qr_code_file = song.get("qr_code", "aa.png")
         if os.path.exists(qr_code_file):
             try:
                 with open(qr_code_file, "rb") as qr_img:
@@ -200,7 +189,7 @@ async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
             pass
             
         no_text = (
-            "🌐 **Website:** [Click here to visit website](https://rotharemix.netlify.app)\n\n"
+            f"🌐 **Website:** [Click here to visit website]({Config.WEBSITE_URL})\n\n"
             "👉 Please send the song code you want to buy:"
         )
         await query.message.reply_text(no_text, parse_mode="Markdown", disable_web_page_preview=True)
@@ -210,11 +199,10 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     song_id = context.user_data.get("pending_song_id")
     info_msg_id = context.user_data.get("info_msg_id")
 
-    songs_db = await fetch_songs_database()
-    if not song_id or song_id not in songs_db:
+    if not song_id or song_id not in SONGS_DATABASE:
         return
 
-    song = songs_db.get(song_id)
+    song = SONGS_DATABASE.get(song_id)
     photo_file_id = update.message.photo[-1].file_id
 
     wait_msg = await update.message.reply_text(
@@ -241,7 +229,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         f"🔔 <b>New Payment Received!</b>\n\n"
         f"👤 <b>Customer:</b> {user.full_name} (@{user.username if user.username else 'No Username'})\n"
         f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
-        f"🎵 <b>Song ID:</b> {song['title']}\n"
+        f"🎵 <b>Song:</b> {song['title']}\n"
         f"💰 <b>Price:</b> {song['price']}\n\n"
     )
 
@@ -280,11 +268,9 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info_msg_id = order_data.get("info_msg_id")
         wait_msg_id = order_data.get("wait_msg_id")
 
-    songs_db = await fetch_songs_database()
-    song = songs_db.get(song_id)
-
+    song = SONGS_DATABASE.get(song_id)
     if not song:
-        await query.message.reply_text("❌ Song data not found on website!")
+        await query.message.reply_text("❌ Song data not found!")
         return
 
     try:
@@ -355,8 +341,7 @@ async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         song_id = order_data["song_id"]
         wait_msg_id = order_data.get("wait_msg_id")
 
-    songs_db = await fetch_songs_database()
-    song = songs_db.get(song_id)
+    song = SONGS_DATABASE.get(song_id)
     song_title = song['title'] if song else "Song"
 
     try:
