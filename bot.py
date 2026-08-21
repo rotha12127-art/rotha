@@ -63,7 +63,7 @@ class Config:
 SONGS_DATABASE = {}
 
 async def fetch_songs_from_website():
-    """Function ទាញយកទិន្នន័យពី songs.js លើ Website មកប្រើក្នុង Bot ដោយប្រើ Flexible Regex"""
+    """Function ទាញយកទិន្នន័យពី songs.js លើ Website មកប្រើក្នុង Bot យ៉ាងជាក់លាក់"""
     global SONGS_DATABASE
     async with httpx.AsyncClient() as client:
         try:
@@ -72,13 +72,13 @@ async def fetch_songs_from_website():
                 js_content = response.text
                 parsed_songs = {}
                 
-                # បែងចែកជា Block របស់ Object នីមួយៗ
+                # បែងចែកជា Block របស់ Object នីមួយៗក្នុង songsData
                 objects = re.split(r'\{', js_content)
                 for obj in objects:
                     if 'trackCode' in obj:
                         song_data = {}
                         
-                        # ទាញយក trackCode (รองรับทั้งเครื่องหมายคำพูดเดี่ยวและคู่)
+                        # ទាញយក trackCode
                         track_code_match = re.search(r'trackCode\s*:\s*["\']([^"\']+)["\']', obj)
                         if track_code_match:
                             song_data['trackCode'] = track_code_match.group(1)
@@ -88,20 +88,18 @@ async def fetch_songs_from_website():
                         if title_match:
                             song_data['title'] = title_match.group(1)
                             
-                        # ទាញយក priceText
+                        # ទាញយក priceText (ជម្រះ HTML tags ចេញខ្លះបើចាំបាច់ ឬទាញយកអត្ថបទ)
                         price_match = re.search(r'priceText\s*:\s*["\']([^"\']+)["\']', obj)
                         if price_match:
-                            song_data['priceText'] = price_match.group(1)
+                            raw_price = price_match.group(1)
+                            # ដក tag HTML ចេញបើមាន ដើម្បីឱ្យស្អាតក្នុង Telegram
+                            clean_price = re.sub(r'<[^>]+>', '', raw_price).strip()
+                            song_data['priceText'] = clean_price if clean_price else "Paid Song"
                             
                         # ទាញយក audioFile
                         audio_match = re.search(r'audioFile\s*:\s*["\']([^"\']+)["\']', obj)
                         if audio_match:
                             song_data['audioFile'] = audio_match.group(1)
-
-                        # ទាញយក isPaid
-                        is_paid_match = re.search(r'isPaid\s*:\s*(true|false)', obj, re.IGNORECASE)
-                        if is_paid_match:
-                            song_data['isPaid'] = is_paid_match.group(1).lower() == 'true'
 
                         track_code = song_data.get('trackCode')
                         if track_code:
@@ -111,16 +109,15 @@ async def fetch_songs_from_website():
                             full_audio_url = f"{Config.WEBSITE_URL}{audio_file}"
                             
                             parsed_songs[track_code] = {
-                                "id": song_data.get('trackCode'),
+                                "id": track_code,
                                 "title": song_data.get('title', 'Unknown Title'),
                                 "price": song_data.get('priceText', '0.00 USD'),
-                                "is_free": not song_data.get('isPaid', False),
                                 "file_url": full_audio_url,
                                 "qr_code": "aa.png"
                             }
                 if parsed_songs:
                     SONGS_DATABASE = parsed_songs
-                    logging.info(f"Successfully loaded {len(SONGS_DATABASE)} songs using Flexible Regex.")
+                    logging.info(f"Successfully loaded {len(SONGS_DATABASE)} songs from songs.js")
         except Exception as e:
             logging.error(f"Failed to fetch songs.js: {e}")
 
