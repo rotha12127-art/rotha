@@ -56,9 +56,9 @@ class Config:
     BOT_TOKEN = "8469005375:AAHXmdGpdMOdPZJYIaIhd4dBq9ZkdUbp-YM"
     ADMIN_GROUP_ID = "-1004401338807"
     
-    # ទីតាំងសម្រាប់កែសម្រួល Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ (Key គឺ Song Code)
+    # 📌 កន្លែងកែសម្រួល Song Code, Title, Price, File និង QR Codes ទាំងអស់នៅទីនេះ
     SONGS_DATABASE = {
-        "song_3": {
+        "song_3": {  # <--- នេះជា Song Code ដែលអតិថិជនត្រូវផ្ញើមក
             "title": "一剪梅",
             "price": "0.99 USD",
             "original_price": "9.99 USD",
@@ -66,6 +66,16 @@ class Config:
             "file_path": "一剪梅.mp3",
             "qr_code": "aa.png",
         },
+        
+        # 💡 ឧទាហរណ៍ប្រសិនបើចង់ថែមបទផ្សេងទៀត (លុបសញ្ញា # ចោល):
+        # "song_2": {
+        #     "title": "Song Name 2",
+        #     "price": "2.00 USD",
+        #     "original_price": "5.00 USD",
+        #     "is_free": False,
+        #     "file_path": "song2.mp3",
+        #     "qr_code": "qr2.png",
+        # },
     }
 # =========================================================================
 
@@ -78,14 +88,21 @@ async def post_init(application):
     asyncio.create_task(self_ping())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # សម្អាតទិន្នន័យចាស់សិនពេលចាប់ផ្តើម
     context.user_data.pop("pending_song_id", None)
-    await update.message.reply_text("Please send the song code you want to buy:")
+    
+    # សាររួមបញ្ចូល Website ជាមួយ Markdown/HTML ស្អាត
+    welcome_text = (
+        "🎵 **Welcome to Rotha Remix Bot!**\n\n"
+        "🌐 **Website:** [Click here to visit website](https://rotharemix.netlify.app)\n\n"
+        "👉 Please send the song code you want to buy:"
+    )
+    
+    await update.message.reply_text(welcome_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
-    # စစ်និតមើលថាតើ text ដែលផ្ញើមក ត្រូវនឹង Song Code ក្នុង Database ដែរឬទេ
+    # ឆែកមើលថាតើ text ដែលផ្ញើមក មានក្នុង Song Code ដែរឬទេ
     if text in Config.SONGS_DATABASE:
         song_id = text
         song = Config.SONGS_DATABASE[song_id]
@@ -116,7 +133,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode="HTML"
         )
     else:
-        # បើផ្ញើមកមិនមែនជា Code ត្រឹមត្រូវ គឺមិនឆ្លើយតបអ្វីទាំងអស់ (Ignore)
+        # បើផ្ញើមកមិនមែនជា Song Code ត្រឹមត្រូវ គឺមិនតបអ្វីទាំងអស់
         return
 
 async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -167,7 +184,6 @@ async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         if info_msg:
             context.user_data["info_msg_id"] = info_msg.message_id
             
-        # លុបសារផ្ទៀងផ្ទាត់ចាស់ចោលដើម្បីកុំឱ្យរញ៉េរញ៉ៃ
         try:
             await query.message.delete()
         except Exception:
@@ -179,7 +195,13 @@ async def confirm_song_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
             await query.message.delete()
         except Exception:
             pass
-        await query.message.reply_text("Please send a song code you want to buy again")
+            
+        # សារពេលចុច No ដែលមាន Website ដូចគ្នា
+        no_text = (
+            "🌐 **Website:** [Click here to visit website](https://rotharemix.netlify.app)\n\n"
+            "👉 Please send the song code you want to buy:"
+        )
+        await query.message.reply_text(no_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -364,16 +386,10 @@ def main():
     app = Application.builder().token(Config.BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
-    
-    # Handler សម្រាប់ຮັບអត្ថបទ (Text) ដែលអតិថិជនផ្ញើកូដបទចម្រៀងមក
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
-    
-    # Handler សម្រាប់ប៊ូតុង Yes / No
     app.add_handler(CallbackQueryHandler(confirm_song_choice, pattern="^confirm_"))
-    
     app.add_handler(CallbackQueryHandler(admin_approve, pattern="^cfm_"))
     app.add_handler(CallbackQueryHandler(admin_reject, pattern="^rej_"))
-    
     app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
 
     print("Bot is running...")
